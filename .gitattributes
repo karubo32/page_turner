@@ -1,0 +1,14 @@
+# デフォルト: LF に統一
+* text=auto eol=lf
+
+# macOS シェルスクリプトは必ず LF
+*.command text eol=lf
+
+# Windows スクリプトは CRLF
+*.vbs text eol=crlf
+*.bat text eol=crlf
+
+# バイナリファイルは変換しない
+*.docx binary
+*.png  binary
+*.jpg  binary
