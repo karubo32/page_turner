@@ -10,6 +10,19 @@ int readSerialLine(char* buf, int bufSize) {
   return len;
 }
 
+// ===== set コマンドの1項目を適用 =====
+// 戻り値: true=適用した / false=名前が不正
+bool applySetting(const char* name, int val) {
+  if      (strcmp(name, "yhome") == 0) Y_HOME = val;
+  else if (strcmp(name, "zhome") == 0) Z_HOME = val;
+  else if (strcmp(name, "ymin")  == 0) Y_MIN  = val;
+  else if (strcmp(name, "ymax")  == 0) Y_MAX  = val;
+  else if (strcmp(name, "zmin")  == 0) Z_MIN  = val;
+  else if (strcmp(name, "zmax")  == 0) Z_MAX  = val;
+  else return false;
+  return true;
+}
+
 // ===== コマンド処理 =====
 void checkSerialInput() {
   if (!Serial.available()) return;
@@ -25,8 +38,6 @@ void checkSerialInput() {
     Serial.println(F("  start / s        : 動作開始"));
     Serial.println(F("  stop / pause / p : 一時停止"));
     Serial.println(F("  resume / r       : 再開"));
-    Serial.println(F("  f / forward      : 順方向"));
-    Serial.println(F("  b / back         : 逆方向"));
     Serial.println(F("  <ページ番号>     : ページジャンプ（例: 150）"));
     Serial.println(F("--- 1ページモード ---"));
     Serial.println(F("  step             : 1ページモード ON/OFF"));
@@ -39,17 +50,17 @@ void checkSerialInput() {
     Serial.println(F("  z+ / z-          : Z軸を1度ずつ移動"));
     Serial.println(F("  y+ / y-          : Y軸を1度ずつ移動"));
     Serial.println(F("  home             : ホームへ戻る"));
-    Serial.println(F("--- メンテナンス ---"));
-    Serial.println(F("  wiper            : ふきふき動作を実行"));
     Serial.println(F("--- キャリブレーション ---"));
-    Serial.println(F("  calib            : キャリブレーション開始"));
+    Serial.println(F("  table            : キャリブテーブル表示"));
+    Serial.println(F("  oz <slot> <val>  : Z角度を設定（例: oz 5 43）"));
     Serial.println(F("  calib_reset      : キャリブデータ消去"));
-    Serial.println(F("  table            : オフセット一覧表示"));
-    Serial.println(F("  oz <slot> <val>  : Z補正（例: oz 5 43）"));
     Serial.println(F("--- テスト ---"));
-    Serial.println(F("  test <page>      : 指定ページのZ値でタップ1回"));
-    Serial.println(F("  testrun          : p.1から全ページ順にタップ(EEPROM保存)"));
-    Serial.println(F("  testrun stop     : testrunモード終了"));
+    Serial.println(F("  t / tap          : タップ動作を1回"));
+    Serial.println(F("  test <page>      : 指定ページのZ値で1ページ分動作"));
+    Serial.println(F("--- 詳細設定 ---"));
+    Serial.println(F("  set              : 設定一覧を表示"));
+    Serial.println(F("  set <name> <val> : 設定変更"));
+    Serial.println(F("                     yhome/zhome/ymin/ymax/zmin/zmax"));
     Serial.println(F("--- 本の設定 ---"));
     Serial.println(F("  pages <num>      : 総ページ数変更 例: pages 320"));
     Serial.println(F("  pages            : 現在の総ページ数を表示"));
@@ -76,12 +87,6 @@ void checkSerialInput() {
   if (strcmp(cmd, "p") == 0 || strcmp(cmd, "pause") == 0 || strcmp(cmd, "stop") == 0) {
     isPaused = true;
     stepMode = false;
-    if (isTestrun) {
-      isTestrun   = false;
-      testrunPage = 1;
-      clearTestrunState();
-      Serial.println(F(">> TESTRUN STOPPED"));
-    }
     Serial.println(F(">> PAUSED"));
     return;
   }
@@ -94,25 +99,6 @@ void checkSerialInput() {
     } else {
       Serial.println(F(">> Not started. Send 'start' first."));
     }
-    return;
-  }
-
-  // === 方向 ===
-  if (strcmp(cmd, "f") == 0 || strcmp(cmd, "forward") == 0) {
-    direction = 1;
-    Serial.println(F(">> DIRECTION: FORWARD"));
-    return;
-  }
-  if (strcmp(cmd, "b") == 0 || strcmp(cmd, "back") == 0 || strcmp(cmd, "reverse") == 0) {
-    direction = -1;
-    Serial.println(F(">> DIRECTION: REVERSE"));
-    return;
-  }
-
-  // === wiper ===
-  if (strcmp(cmd, "wiper") == 0) {
-    isPaused = true;
-    wiperMotion();
     return;
   }
 
@@ -137,13 +123,12 @@ void checkSerialInput() {
   // === z <angle> ===
   if (strncmp(cmd, "z ", 2) == 0 && cmd[2] != '+' && cmd[2] != '-') {
     if (isPaused) {
-      int req      = atoi(cmd + 2);
-      int physical = applyDirection(req);
-      int clamped  = constrain(physical, Z_MIN, Z_MAX);
+      int req     = atoi(cmd + 2);
+      int clamped = constrain(req, Z_MIN, Z_MAX);
       zaxis.write(clamped);
       Serial.print(F(">> Z -> "));
-      Serial.print(req);
-      if (clamped != physical) Serial.print(F(" [LIMIT]"));
+      Serial.print(clamped);
+      if (clamped != req) Serial.print(F(" [LIMIT]"));
       Serial.println();
     } else {
       Serial.println(F(">> 一時停止中のみ使用可"));
@@ -154,13 +139,12 @@ void checkSerialInput() {
   // === y <angle> ===
   if (strncmp(cmd, "y ", 2) == 0 && cmd[2] != '+' && cmd[2] != '-') {
     if (isPaused) {
-      int req      = atoi(cmd + 2);
-      int physical = applyDirection(req);
-      int clamped  = constrain(physical, Y_MIN, Y_MAX);
+      int req     = atoi(cmd + 2);
+      int clamped = constrain(req, Y_MIN, Y_MAX);
       yaxis.write(clamped);
       Serial.print(F(">> Y -> "));
-      Serial.print(req);
-      if (clamped != physical) Serial.print(F(" [LIMIT]"));
+      Serial.print(clamped);
+      if (clamped != req) Serial.print(F(" [LIMIT]"));
       Serial.println();
     } else {
       Serial.println(F(">> 一時停止中のみ使用可"));
@@ -223,18 +207,12 @@ void checkSerialInput() {
     return;
   }
 
-  // === calib ===
-  if (strcmp(cmd, "calib") == 0) {
-    isPaused    = true;
-    isCalibMode = true;
-    return;
-  }
-
   // === calib_reset ===
   if (strcmp(cmd, "calib_reset") == 0) {
-    for (int i = 0; i < calibSections; i++) zOffsets[i] = Z_TOUCH_MIN;
+    for (int i = 0; i < calibSections; i++) zOffsets[i] = Z_TOUCH_DEFAULT;
     EEPROM.write(EEPROM_MAGIC_ADDR, 0x00);
     Serial.println(F(">> CALIB RESET"));
+    printOffsetTable();
     return;
   }
 
@@ -286,6 +264,54 @@ void checkSerialInput() {
     return;
   }
 
+  // === set: 設定一覧を表示 ===
+  if (strcmp(cmd, "set") == 0) {
+    printSettings();
+    return;
+  }
+
+  // === set <name> <val>: 設定変更 ===
+  if (strncmp(cmd, "set ", 4) == 0) {
+    char name[8];
+    int  val = 0;
+    if (sscanf(cmd + 4, "%7s %d", name, &val) != 2) {
+      Serial.println(F(">> 書式: set <name> <val>  例: set yhome 90"));
+      return;
+    }
+    if (val < 0 || val > 255) {
+      Serial.println(F(">> 範囲外です (0〜255)"));
+      return;
+    }
+
+    // 変更前の値を控え、破綻したら戻す
+    int oy = Y_HOME, oz = Z_HOME, oyl = Y_MIN, oyu = Y_MAX, ozl = Z_MIN, ozu = Z_MAX;
+
+    if (!applySetting(name, val)) {
+      Serial.println(F(">> 不明な設定名 (yhome/zhome/ymin/ymax/zmin/zmax)"));
+      return;
+    }
+
+    if (Y_MIN >= Y_MAX || Z_MIN >= Z_MAX) {
+      Y_HOME = oy;  Z_HOME = oz;
+      Y_MIN  = oyl; Y_MAX  = oyu;
+      Z_MIN  = ozl; Z_MAX  = ozu;
+      Serial.println(F(">> 却下: MIN は MAX より小さくしてください"));
+      return;
+    }
+
+    saveSettingsToEEPROM();
+    Serial.print(F(">> SET "));
+    Serial.print(name);
+    Serial.print(F(" = "));
+    Serial.println(val);
+
+    if (Y_HOME < Y_MIN || Y_HOME > Y_MAX || Z_HOME < Z_MIN || Z_HOME > Z_MAX) {
+      Serial.println(F(">> 注意: HOME がリミット範囲外です"));
+    }
+    printSettings();
+    return;
+  }
+
   // === pages ===
   if (strcmp(cmd, "pages") == 0) {
     Serial.print(F(">> TOTAL PAGES: "));
@@ -313,7 +339,7 @@ void checkSerialInput() {
   }
 
   // === test <page> ===
-  if (strncmp(cmd, "test ", 5) == 0 && cmd[5] != 'r') {
+  if (strncmp(cmd, "test ", 5) == 0) {
     int testPage = atoi(cmd + 5);
     if (testPage >= 0 && testPage < totalPages) {
       int savedPage = currentPage;
@@ -331,29 +357,6 @@ void checkSerialInput() {
     } else {
       Serial.println(F(">> ページ範囲外"));
     }
-    return;
-  }
-
-  // === testrun stop ===
-  if (strcmp(cmd, "testrun stop") == 0) {
-    isTestrun   = false;
-    testrunPage = 1;
-    clearTestrunState();
-    goHome();
-    Serial.println(F(">> TESTRUN STOPPED"));
-    return;
-  }
-
-  // === testrun ===
-  if (strcmp(cmd, "testrun") == 0) {
-    isTestrun   = true;
-    testrunPage = 1;
-    saveTestrunState();
-    Serial.println(F("=== TESTRUN MODE START ==="));
-    Serial.print(F(">> 総ページ数: "));
-    Serial.println(totalPages);
-    Serial.println(F(">> p.1 から順番にタップします"));
-    Serial.println(F(">> 'testrun stop' で終了"));
     return;
   }
 

@@ -5,7 +5,7 @@
 本めくり装置の制御システムです。以下の2つのコンポーネントで構成されます。
 
 - **`gui/page_turner_gui.py`** — Python/tkinter GUIアプリ。pyserialでArduinoとシリアル通信
-- **`firmware/bookv9/`** — Arduino Nanoファームウェア（5ファイル構成）
+- **`firmware/bookv9/`** — Arduino Nanoファームウェア（4ファイル構成）
 
 ---
 
@@ -13,11 +13,10 @@
 
 | ファイル | 内容 |
 |---------|------|
-| `bookv9.ino` | グローバル変数・定数・setup・loop |
-| `motion.ino` | moveSmooth / tapMotion / yMotion / goHome / wiperMotion |
-| `calib.ino` | EEPROM・補間・printOffsetTable・runCalibration |
+| `bookv9.ino` | グローバル変数・可変設定・EEPROM・setup・loop |
+| `motion.ino` | moveSmooth / tapMotion / yMotion / goHome |
+| `calib.ino` | 補間・キャリブEEPROM・printOffsetTable |
 | `commands.ino` | readSerialLine・checkSerialInput（全コマンド） |
-| `testrun.ino` | saveTestrunState・clearTestrunState・runTestrun |
 
 ---
 
@@ -31,6 +30,9 @@
 - `total_pages` / `CALIB_INTERVAL` はGUIとArduino側で値を合わせること（両方 **50** 固定）
 - tkinterはスレッドセーフでないため、シリアル受信は別スレッド→`log_queue`→メインスレッドで処理する構造を維持すること
 - `FlatButton` は `tk.Label` ベースのカスタムボタン。`tk.Button` に変更しないこと（スタイルが崩れる）
+- 接続時に `_fetch_all()` が `pages` → `table` → `set` を順に送って自動取得する
+- `_update_total_pages()` は総ページ数が変わった時だけテーブルを再構築する。  
+  無条件に再構築すると取得済みのZ値が消えるため、このガードを外さないこと
 
 ### ファームウェア (bookv9/)
 
@@ -40,38 +42,39 @@
 - EEPROMレイアウト:
   - addr 0: マジックバイト (0xAB)
   - addr 1〜11: zOffsets[0〜10]（CALIB_SECTIONS_MAX=11分）
-  - addr 12〜14: testrunモード保存
+  - addr 12〜14: 未使用（旧 testrun 保存領域）
   - addr 15〜17: totalPages保存 (magic + 2byte)
   - addr 18〜20: globalSpeed保存 (magic + value×100 の2byte)
+  - addr 21〜27: 可変設定保存 (magic + 6値)
 - `CALIB_SECTIONS_MAX = 11` を超える区間数には対応していない
 - `moveSmooth()` のspeedScaleは呼び出しごとに調整済み。むやみに変更しないこと
-- ページは**2ページ単位**で進む（currentPage += direction * 2）
-- testrunも**2ページ単位**（testrunPage += 2）
+- ページは**2ページ単位**で進む（currentPage += 2）
 
-### サーボ角度リミット
+### 可変設定（ホーム位置・サーボリミット）
 
-全動作（自動・手動）に共通のリミットが `bookv9.ino` に定義されている。  
-変更は以下の4定数のみ。**Y_MIN ≤ Y_HOME ≤ Y_MAX**、**Z_MIN ≤ Z_HOME ≤ Z_MAX** を守ること。
+`bookv9.ino` で **変数** として定義され、`set` コマンド／GUIの「詳細設定」から変更でき、
+EEPROMに保存される。定数に戻さないこと。
 
 ```cpp
-const int Y_HOME = 90;   // Y軸待機位置
-const int Z_HOME = 90;   // Z軸待機位置
-
-const int Y_MIN = 45;    // Y軸リミット（物理角度）
-const int Y_MAX = 210;
-const int Z_MIN = 20;    // Z軸リミット（物理角度）
-const int Z_MAX = 160;
+int Y_HOME = 90;    // Y軸待機位置
+int Z_HOME = 90;    // Z軸待機位置
+int Y_MIN  = 45;    // Y軸リミット
+int Y_MAX  = 210;
+int Z_MIN  = 20;    // Z軸リミット
+int Z_MAX  = 160;
 ```
 
+- `set` は `[SET] <name>=<value>` 形式で出力する。GUIの `_parse_table_line()` がこれをパースするので**書式を変えないこと**
+- `MIN >= MAX` になる変更は拒否される
 - `moveSmooth()` はサーボアドレスで軸を識別し、自動でリミットを適用する
-- `writeY(logicalAngle)` / `writeZ(logicalAngle)` は applyDirection + constrain をまとめたヘルパー。直接書き込みにはこちらを使う
+- `writeY()` / `writeZ()` は constrain 付きの直接書き込みヘルパー
 
 ---
 
 ## よくある作業パターン
 
 ### キャリブ関連の修正
-`firmware/bookv9/calib.ino` の `runCalibration()` と `gui/page_turner_gui.py` の `_parse_table_line()` / `_send_oz()` はセットで修正する。
+`firmware/bookv9/calib.ino` の `printOffsetTable()` と `gui/page_turner_gui.py` の `_parse_table_line()` / `_send_oz()` はセットで修正する。
 
 ### コマンド追加
 1. `firmware/bookv9/commands.ino` の `checkSerialInput()` にコマンド処理を追加

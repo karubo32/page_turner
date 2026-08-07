@@ -17,11 +17,10 @@ page_turner/
 │   └── page_turner_gui.py   # Python GUIアプリ (tkinter + pyserial)
 ├── firmware/
 │   └── bookv9/              # Arduino スケッチフォルダ
-│       ├── bookv9.ino       # 定数・グローバル変数・setup・loop
+│       ├── bookv9.ino       # 設定・グローバル変数・EEPROM・setup・loop
 │       ├── motion.ino       # サーボ動作関数
-│       ├── calib.ino        # キャリブレーション・EEPROM
-│       ├── commands.ino     # シリアルコマンドパーサー
-│       └── testrun.ino      # 全ページ通しテスト
+│       ├── calib.ino        # キャリブテーブル・補間・EEPROM
+│       └── commands.ino     # シリアルコマンドパーサー
 └── docs/
     └── spec_v2.docx         # 機能仕様書
 ```
@@ -79,12 +78,15 @@ python gui/page_turner_gui.py
 | `speed <val>` | 速度変更 (0.1〜5.0) |
 | `oz <slot> <angle>` | キャリブ角度を直接指定 |
 | `table` | キャリブテーブル表示 |
-| `calib` | インタラクティブキャリブレーション |
-| `testrun` | 全ページ通しテスト |
+| `calib_reset` | キャリブデータ消去 |
+| `t` / `tap` | タップ動作を1回 |
+| `test <page>` | 指定ページのZ値で1ページ分動作 |
+| `set` | 詳細設定の一覧表示 |
+| `set <name> <val>` | 詳細設定の変更 |
 | `pages <num>` | 総ページ数変更 |
 | `help` | コマンド一覧 |
 
-詳細は `docs/spec_v2.docx` を参照してください。
+詳細は `docs/spec_v3.docx` を参照してください。
 
 ---
 
@@ -93,23 +95,31 @@ python gui/page_turner_gui.py
 - **50ページごと**に区間を分けてZ軸の押し付け角度を管理（最大11区間）
 - 区間間は線形補間で自動接続
 - 設定値はEEPROMに保存（電源OFFでも保持）
-- GUIのキャリブテーブルから各区間の角度を直接編集・送信可能
+- GUIのキャリブテーブルから各区間の角度を直接編集・送信
+- 接続時にテーブルの値と総ページ数を**自動取得**
 
 ---
 
-## サーボ角度リミット
+## 詳細設定（ホーム位置・サーボリミット）
 
-全動作（自動・手動）に共通のリミットが適用されます。  
-変更は `firmware/bookv9/bookv9.ino` の定数のみ。
+GUI 左サイドバーの「⚙ 詳細設定」から変更できます。  
+変更内容は Arduino の EEPROM に保存され、電源を切っても保持されます。
 
-```cpp
-const int Y_HOME = 90;   // Y軸待機位置
-const int Z_HOME = 90;   // Z軸待機位置
+| 項目 | 説明 | 初期値 |
+|------|------|--------|
+| `yhome` | Y軸の待機角度 | 90 |
+| `zhome` | Z軸の待機角度 | 90 |
+| `ymin` / `ymax` | Y軸の可動範囲 | 45 / 210 |
+| `zmin` / `zmax` | Z軸の可動範囲 | 20 / 160 |
 
-const int Y_MIN = 45;    // Y軸リミット
-const int Y_MAX = 135;
-const int Z_MIN = 20;    // Z軸リミット
-const int Z_MAX = 110;
+リミットは自動動作・手動操作の**すべてに適用**され、サーボの破損を防ぎます。  
+`MIN >= MAX` になる変更は拒否されます。
+
+シリアルから直接変更する場合:
+
+```
+set              # 一覧表示
+set yhome 95     # 変更
 ```
 
 ---

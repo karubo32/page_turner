@@ -1,4 +1,7 @@
-// calib.ino — キャリブレーション・EEPROM・補間
+// calib.ino — キャリブレーションテーブル・EEPROM・補間
+//
+// 区間ごとのZ絶対角度は GUI のキャリブレーションテーブル（oz コマンド）から
+// 設定する。対話式のキャリブレーション走行は廃止した。
 
 // ===== 区間インデックス =====
 int getSectionIndex(int page) {
@@ -57,106 +60,4 @@ void printOffsetTable() {
     Serial.println(zOffsets[i]);
   }
   Serial.println(F("--------------------"));
-}
-
-// ===== キャリブレーション1区間の動作シーケンス =====
-void runCalibSequence() {
-  logStatus("CAL_TAP");
-  tapMotion();
-  logStatus("CAL_HAGASI");
-  yMotion();
-  logStatus("CAL_RETURN");
-  moveSmooth(zaxis, getZHold(), Z_HOME, 1.0);
-}
-
-// ===== キャリブレーション走行 =====
-void runCalibration() {
-  Serial.println(F("=== CALIBRATION MODE ==="));
-  Serial.println(F("Enter: 動作確認 / 数値: offset設定 / t: 設定値で試行 / h: 再試行 / s: スキップ"));
-
-  for (int i = 0; i < calibSections; i++) {
-    int secPage = i * CALIB_INTERVAL;
-    if (secPage >= totalPages) break;
-
-    currentPage = secPage;
-
-    Serial.print(F("[SEC "));
-    Serial.print(i);
-    Serial.print(F("] page="));
-    Serial.print(secPage);
-    Serial.print(F(" 現在Z="));
-    Serial.print(getZTarget());
-    Serial.println(F(" | Enter: 動作確認 / s: スキップ"));
-
-    while (!Serial.available()) delay(50);
-    char input[16];
-    readSerialLine(input, sizeof(input));
-
-    if (input[0] == 's' || input[0] == 'S') {
-      Serial.println(F("SKIP"));
-      continue;
-    }
-
-    Serial.println(F(">> 動作確認中..."));
-    runCalibSequence();
-
-    Serial.println(F("  数値: offset設定 / t: 再試行 / h: offset0で試行 / ok: 確定 / s: スキップ"));
-    while (true) {
-      Serial.print(F("  > "));
-      while (!Serial.available()) delay(50);
-
-      char input2[16];
-      readSerialLine(input2, sizeof(input2));
-
-      if (input2[0] == 'h' || input2[0] == 'H') {
-        goHome();
-        Serial.println(F(">> 再試行..."));
-        runCalibSequence();
-        Serial.println(F("  数値: offset設定 / t: 設定値で試行 / h: 再試行 / ok: 確定 / s: スキップ"));
-        continue;
-      }
-
-      if (input2[0] == 't' || input2[0] == 'T') {
-        Serial.print(F(">> 試行 Z="));
-        Serial.println(getZTarget());
-        goHome();
-        runCalibSequence();
-        Serial.println(F("  数値: offset設定 / t: 再試行 / h: offset0で試行 / s: スキップ"));
-        continue;
-      }
-
-      if (input2[0] == 's' || input2[0] == 'S') {
-        Serial.println(F("SKIP"));
-        break;
-      }
-
-      int actual = atoi(input2);
-      if (actual > 0) {
-        zOffsets[i] = actual;
-        Serial.print(F(">> Z="));
-        Serial.print(zOffsets[i]);
-        Serial.print(F(" (次タップ予測: "));
-        Serial.print(getZTarget());
-        Serial.println(F(")"));
-        Serial.println(F("  't' で試行 / 別の数値で再設定 / 's' でスキップ / 'ok' で確定"));
-        continue;
-      }
-
-      if (strcmp(input2, "ok") == 0) {
-        Serial.print(F(">> 確定 Z="));
-        Serial.println(zOffsets[i]);
-        break;
-      }
-
-      Serial.println(F("  無効。数値 / t / h / s / ok を入力"));
-    }
-  }
-
-  saveCalibToEEPROM();
-  printOffsetTable();
-  Serial.println(F("=== CALIBRATION DONE ==="));
-  Serial.println(F(">> 'start' で動作開始"));
-  isCalibMode = false;
-  currentPage = 0;
-  goHome();
 }

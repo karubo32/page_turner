@@ -116,6 +116,11 @@ class PageTurnerGUI:
         self.calib_rows  = {}
         self.total_pages = DEFAULT_TOTAL_PAGES
 
+        # Arduino の詳細設定（`set` コマンドの応答で埋まる）
+        self.settings      = {}
+        self.settings_win  = None
+        self.settings_vars = {}
+
         self._build_ui()
         self._refresh_ports()
         self._poll_log()
@@ -250,22 +255,6 @@ class PageTurnerGUI:
                    bg=RED_C, hover_bg="#DC2626", fg="#fff",
                    font_size=10, padx=10, pady=5).pack(side="left")
 
-        # ── Testrun カード ──
-        c_tr = Card(sb)
-        c_tr.pack(fill="x", pady=(0, 10))
-        SectionLabel(c_tr, "Testrun").pack(anchor="w", padx=14, pady=(10, 6))
-        trrow = tk.Frame(c_tr, bg=SURFACE)
-        trrow.pack(fill="x", padx=10, pady=(0, 12))
-        FlatButton(trrow, "▶ Start", command=lambda: self._send("testrun"),
-                   bg=GREEN_C, hover_bg="#16A34A",
-                   font_size=10, padx=12, pady=5).pack(side="left", padx=(0, 6))
-        FlatButton(trrow, "■ Stop", command=lambda: self._send("testrun stop"),
-                   bg=RED_C, hover_bg="#DC2626", fg="#fff",
-                   font_size=10, padx=10, pady=5).pack(side="left")
-        tk.Label(c_tr, text="p.1から全ページ順にタップ・電源再投入後も継続",
-                 bg=SURFACE, fg=TEXT3, font=("Segoe UI", 8),
-                 wraplength=220, justify="left").pack(anchor="w", padx=14, pady=(0, 10))
-
         # ── 速度カード ──
         c4 = Card(sb)
         c4.pack(fill="x", pady=(0, 10))
@@ -306,11 +295,19 @@ class PageTurnerGUI:
         c6 = Card(sb)
         c6.pack(fill="x", pady=(0, 10))
         SectionLabel(c6, "Calibration").pack(anchor="w", padx=14, pady=(10, 6))
-        FlatButton(c6, "Start Calibration", command=self._cmd_calib,
-                   bg=AMBER, hover_bg="#D97706", fg="#1A1D23",
-                   font_size=10).pack(fill="x", padx=10, pady=(0, 6))
+        tk.Label(c6, text="調整は右のキャリブテーブルから行います",
+                 bg=SURFACE, fg=TEXT3, font=("Segoe UI", 8),
+                 wraplength=220, justify="left").pack(anchor="w", padx=14, pady=(0, 8))
         FlatButton(c6, "Reset All Data", command=self._cmd_calib_reset,
                    bg=SURFACE2, hover_bg="#FEE2E2", fg=RED_C,
+                   font_size=10).pack(fill="x", padx=10, pady=(0, 12))
+
+        # ── 詳細設定カード ──
+        c7 = Card(sb)
+        c7.pack(fill="x", pady=(0, 10))
+        SectionLabel(c7, "Advanced").pack(anchor="w", padx=14, pady=(10, 6))
+        FlatButton(c7, "⚙  詳細設定", command=self._open_settings,
+                   bg=AMBER, hover_bg="#D97706", fg="#1A1D23",
                    font_size=10).pack(fill="x", padx=10, pady=(0, 12))
 
     # ── メインエリア ──
@@ -586,8 +583,15 @@ class PageTurnerGUI:
         self.log_text.configure(state="disabled")
 
     def _parse_table_line(self, line):
-        # Arduino から総ページ数変更通知を受信したら自動同期
-        m_pages = re.search(r'TOTAL PAGES SET:\s*(\d+)', line)
+        # 詳細設定の値（`set` コマンドの応答）
+        m_set = re.search(r'\[SET\]\s+(\w+)=(-?\d+)', line)
+        if m_set:
+            self.settings[m_set.group(1)] = m_set.group(2)
+            self.root.after(0, self._refresh_settings_fields)
+            return
+
+        # 総ページ数（`pages` の応答 / `pages <n>` の変更通知）
+        m_pages = re.search(r'TOTAL PAGES(?:\s+SET)?:\s*(\d+)', line)
         if m_pages:
             n = int(m_pages.group(1))
             self.root.after(0, lambda: self._update_total_pages(n))
@@ -633,6 +637,8 @@ class PageTurnerGUI:
             self.status_lbl.configure(text=f"Connected  {port}", fg=GREEN)
             self._log(f"Connected: {port} @ 115200 bps", "info")
             threading.Thread(target=self._read_loop, daemon=True).start()
+            # 総ページ数 → キャリブテーブル → 詳細設定 の順に自動取得
+            self.root.after(400, self._fetch_all)
         except Exception as e:
             messagebox.showerror("Connection Error", str(e))
 
@@ -682,7 +688,12 @@ class PageTurnerGUI:
     def _cmd_step(self):     self._send("step")
     def _cmd_step_off(self): self._send("step off")
     def _cmd_next(self):   self._send("n")
-    def _cmd_calib(self):  self._send("calib")
+
+    def _fetch_all(self):
+        """接続直後に総ページ数・キャリブテーブル・詳細設定をまとめて取得"""
+        self._send("pages")
+        self.root.after(400, lambda: self._send("table"))
+        self.root.after(900, lambda: self._send("set"))
 
     def _cmd_set_total_pages(self):
         v = self.total_pages_var.get().strip()
@@ -699,6 +710,10 @@ class PageTurnerGUI:
 
     def _update_total_pages(self, n: int):
         """total_pagesを更新してGUIを再構築"""
+        if n == self.total_pages:
+            # 区間数は変わらないので、取得済みのZ値を消さないよう再構築しない
+            self.total_pages_var.set(str(n))
+            return
         self.total_pages = n
         self.total_pages_var.set(str(n))
         self.page_max_lbl.configure(text=f"/ {n}")
@@ -771,6 +786,113 @@ class PageTurnerGUI:
         if cmd:
             self._send(cmd)
             self.cmd_var.set("")
+
+    # ══════════════════════════════════════
+    #  詳細設定ダイアログ
+    # ══════════════════════════════════════
+    SETTINGS_FIELDS = [
+        ("yhome", "Y ホーム位置", "Y軸の待機角度"),
+        ("zhome", "Z ホーム位置", "Z軸の待機角度"),
+        ("ymin",  "Y 下限",       "Y軸が下回れない角度"),
+        ("ymax",  "Y 上限",       "Y軸が超えられない角度"),
+        ("zmin",  "Z 下限",       "Z軸が下回れない角度"),
+        ("zmax",  "Z 上限",       "Z軸が超えられない角度"),
+    ]
+
+    def _open_settings(self):
+        # すでに開いていれば前面に出すだけ
+        if self.settings_win is not None and self.settings_win.winfo_exists():
+            self.settings_win.lift()
+            self.settings_win.focus_force()
+            return
+
+        win = tk.Toplevel(self.root)
+        self.settings_win = win
+        win.title("詳細設定")
+        win.configure(bg=BG)
+        win.resizable(False, False)
+        win.transient(self.root)
+
+        def _on_close():
+            self.settings_win = None
+            win.destroy()
+        win.protocol("WM_DELETE_WINDOW", _on_close)
+
+        card = Card(win)
+        card.pack(fill="both", expand=True, padx=14, pady=14)
+
+        tk.Label(card, text="サーボ設定", bg=SURFACE, fg=TEXT,
+                 font=("Segoe UI", 12, "bold")).grid(row=0, column=0, columnspan=3,
+                                                     sticky="w", padx=14, pady=(12, 2))
+        tk.Label(card, text="変更するとArduinoのEEPROMに保存されます",
+                 bg=SURFACE, fg=TEXT3, font=("Segoe UI", 8)).grid(
+                     row=1, column=0, columnspan=3, sticky="w", padx=14, pady=(0, 8))
+
+        self.settings_vars = {}
+        for i, (key, label, hint) in enumerate(self.SETTINGS_FIELDS):
+            r = i + 2
+            tk.Label(card, text=label, bg=SURFACE, fg=TEXT2,
+                     font=("Segoe UI", 10), anchor="w", width=13).grid(
+                         row=r, column=0, sticky="w", padx=(14, 6), pady=4)
+
+            var = tk.StringVar(value=self.settings.get(key, "—"))
+            self.settings_vars[key] = var
+            ValueEntry(card, textvariable=var, width=6).grid(
+                row=r, column=1, pady=4, ipady=3)
+
+            tk.Label(card, text=hint, bg=SURFACE, fg=TEXT3,
+                     font=("Segoe UI", 8), anchor="w").grid(
+                         row=r, column=2, sticky="w", padx=(10, 14))
+
+        btn_row = tk.Frame(card, bg=SURFACE)
+        btn_row.grid(row=len(self.SETTINGS_FIELDS) + 2, column=0, columnspan=3,
+                     sticky="ew", padx=14, pady=(12, 14))
+
+        FlatButton(btn_row, "↺  再取得", command=lambda: self._send("set"),
+                   bg=SURFACE2, hover_bg=BORDER, fg=TEXT,
+                   font_size=9, padx=12, pady=5).pack(side="left")
+        FlatButton(btn_row, "適用", command=self._apply_settings,
+                   bg=BLUE, hover_bg=BLUE_D,
+                   font_size=10, bold=True, padx=18, pady=5).pack(side="right")
+
+        # 開いた時点の値を取り直す
+        if self.connected:
+            self._send("set")
+
+    def _refresh_settings_fields(self):
+        """`[SET]` 受信時に開いているダイアログの表示を更新する"""
+        if self.settings_win is None or not self.settings_win.winfo_exists():
+            return
+        for key, var in self.settings_vars.items():
+            if key in self.settings:
+                var.set(self.settings[key])
+
+    def _apply_settings(self):
+        """変更された項目だけ `set <name> <val>` で送信する"""
+        pending = []
+        for key, _label, _hint in self.SETTINGS_FIELDS:
+            raw = self.settings_vars[key].get().strip()
+            if raw in ("—", ""):
+                continue
+            try:
+                val = int(raw)
+            except ValueError:
+                messagebox.showerror("Error", f"{key}: 整数を入力してください")
+                return
+            if not (0 <= val <= 255):
+                messagebox.showerror("Error", f"{key}: 0〜255 で入力してください")
+                return
+            if self.settings.get(key) != str(val):
+                pending.append((key, val))
+
+        if not pending:
+            self._log("設定に変更はありません", "info")
+            return
+
+        for delay, (key, val) in enumerate(pending):
+            self.root.after(delay * 150, lambda k=key, v=val: self._send(f"set {k} {v}"))
+        # 送信完了後に読み直して表示を同期
+        self.root.after(len(pending) * 150 + 300, lambda: self._send("set"))
 
 
 # ══════════════════════════════════════════

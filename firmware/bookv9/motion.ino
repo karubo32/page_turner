@@ -5,8 +5,8 @@
 void moveSmooth(Servo& servo, int startPos, int endPos, float speedScale) {
   int minA = (&servo == &yaxis) ? Y_MIN : Z_MIN;
   int maxA = (&servo == &yaxis) ? Y_MAX : Z_MAX;
-  startPos = constrain(applyDirection(startPos), minA, maxA);
-  endPos   = constrain(applyDirection(endPos),   minA, maxA);
+  startPos = constrain(startPos, minA, maxA);
+  endPos   = constrain(endPos,   minA, maxA);
   int distance = abs(endPos - startPos);
   if (distance == 0) return;
   int step = (startPos < endPos) ? 1 : -1;
@@ -30,10 +30,10 @@ void goHome() {
 
 // ===== タップ動作 =====
 void tapMotion() {
-  int touchPos  = getZTarget();
+  int touchPos   = getZTarget();
   int liftOffset = 8;
-  int zHold     = getZHold();
-  int lift      = min(touchPos + liftOffset, zHold - 5);
+  int zHold      = getZHold();
+  int lift       = min(touchPos + liftOffset, zHold - 5);
 
   moveSmooth(zaxis, Z_HOME,      touchPos,    2.0);
   delay(80);
@@ -52,33 +52,4 @@ void yMotion() {
   moveSmooth(yaxis, 80, 65, 6.0);
   moveSmooth(yaxis, 65, 50, 3.0);
   moveSmooth(yaxis, 50, Y_HOME, 1.4);
-}
-
-// ===== ワイパー動作 =====
-void wiperMotion() {
-  Serial.println(F(">> WIPER START"));
-
-  moveSmooth(yaxis, Y_HOME, wy5, 2.0);
-  moveSmooth(zaxis, Z_HOME, wz2, 2.0);
-  delay(2000);
-
-  for (int i = 0; i < 5; i++) {
-    moveSmooth(yaxis, wy1, wy2, 2.0);
-    moveSmooth(zaxis, wz1, wz2, 2.0);
-    moveSmooth(yaxis, wy2, wy1, 2.0);
-    moveSmooth(zaxis, wz2, wz1, 2.0);
-  }
-  moveSmooth(yaxis, wy1, wy3, 2.0);
-
-  for (int i = 0; i < 5; i++) {
-    moveSmooth(yaxis, wy3, wy4, 2.0);
-    moveSmooth(zaxis, wz1, wz2, 2.0);
-    moveSmooth(yaxis, wy4, wy3, 2.0);
-    moveSmooth(zaxis, wz2, wz1, 2.0);
-  }
-
-  moveSmooth(zaxis, wz1, Z_HOME, 2.0);
-  moveSmooth(yaxis, wy3, Y_HOME, 2.0);
-
-  Serial.println(F(">> WIPER DONE"));
 }
