@@ -18,6 +18,7 @@ void  moveSmoothDual(int yStart, int yEnd, int zStart, int zEnd, float speedScal
 void  goHome();
 void  tapMotion();
 void  yMotion();
+void  pressMotion();
 
 int   getSectionIndex(int page);
 float getInterpolatedZ(int page);
@@ -38,8 +39,15 @@ int Y_HOME = 90;    // Y軸待機位置
 int Z_HOME = 90;    // Z軸待機位置
 int Y_MIN  = 45;    // Y軸リミット（下限）
 int Y_MAX  = 210;   // Y軸リミット（上限）
-int Z_MIN  = 1;    // Z軸リミット（下限）
-int Z_MAX  = 160;   // Z軸リミット（上限）
+int Z_MIN  = 1;     // Z軸リミット（下限）
+int Z_MAX  = 180;   // Z軸リミット（上限）
+
+// めくったページを押さえる角度（ページ位置で先頭→最終を線形補間）
+int PRESS_START = 168;   // 先頭ページ
+int PRESS_END   = 174;   // 最終ページ
+
+// 押さえたまま保持する時間 [ms]
+const int PRESS_HOLD_MS = 300;
 
 // キャリブ未設定時の Z 初期値
 const int Z_TOUCH_DEFAULT = 43;
@@ -47,6 +55,12 @@ const int Z_TOUCH_DEFAULT = 43;
 int getZHold() {
   float ratio = (float)currentPage / totalPages;
   return (int)(130 + ratio * (145 - 130));  // 130→145度
+}
+
+// ページ押さえ角度（ページが進むほど PRESS_START → PRESS_END へ）
+int getPressAngle() {
+  float ratio = (float)currentPage / totalPages;
+  return (int)(PRESS_START + ratio * (PRESS_END - PRESS_START));
 }
 
 // ===== 状態 =====
@@ -73,8 +87,10 @@ const int EEPROM_PAGES_ADDR     = 15;  // totalPages  (15: magic, 16-17: value)
 const int EEPROM_PAGES_MAGIC    = 0xD3;
 const int EEPROM_SPEED_ADDR     = 18;  // globalSpeed (18: magic, 19-20: value×100)
 const int EEPROM_SPEED_MAGIC    = 0xE5;
-const int EEPROM_SETTINGS_ADDR  = 21;  // 可変設定 (21: magic, 22-27: 6値)
-const int EEPROM_SETTINGS_MAGIC = 0xF1;
+const int EEPROM_SETTINGS_ADDR  = 21;  // 可変設定 (21: magic, 22-29: 8値)
+// 保存する項目数を変えたらマジックも変えること。
+// 旧レイアウトのデータが読み込まれず、新しい既定値が入る。
+const int EEPROM_SETTINGS_MAGIC = 0xF2;
 
 // ===== 速度設定 =====
 float globalSpeed = 1.50;  // 0.1=遅い / 1.0=標準 / 5.0=速い
@@ -96,6 +112,8 @@ void saveSettingsToEEPROM() {
   EEPROM.write(EEPROM_SETTINGS_ADDR + 4, (uint8_t)Y_MAX);
   EEPROM.write(EEPROM_SETTINGS_ADDR + 5, (uint8_t)Z_MIN);
   EEPROM.write(EEPROM_SETTINGS_ADDR + 6, (uint8_t)Z_MAX);
+  EEPROM.write(EEPROM_SETTINGS_ADDR + 7, (uint8_t)PRESS_START);
+  EEPROM.write(EEPROM_SETTINGS_ADDR + 8, (uint8_t)PRESS_END);
 }
 
 // ===== 可変設定のEEPROM読み込み =====
@@ -108,6 +126,8 @@ void loadSettingsFromEEPROM() {
   int yu = EEPROM.read(EEPROM_SETTINGS_ADDR + 4);
   int zl = EEPROM.read(EEPROM_SETTINGS_ADDR + 5);
   int zu = EEPROM.read(EEPROM_SETTINGS_ADDR + 6);
+  int ps = EEPROM.read(EEPROM_SETTINGS_ADDR + 7);
+  int pe = EEPROM.read(EEPROM_SETTINGS_ADDR + 8);
 
   // 壊れた値で動かないよう最低限の整合性チェック
   if (yl >= yu || zl >= zu) return;
@@ -115,6 +135,7 @@ void loadSettingsFromEEPROM() {
   Y_HOME = yh;  Z_HOME = zh;
   Y_MIN  = yl;  Y_MAX  = yu;
   Z_MIN  = zl;  Z_MAX  = zu;
+  PRESS_START = ps;  PRESS_END = pe;
 }
 
 // ===== 設定一覧表示（GUIがパースする形式）=====
@@ -126,6 +147,8 @@ void printSettings() {
   Serial.print(F("[SET] ymax="));  Serial.println(Y_MAX);
   Serial.print(F("[SET] zmin="));  Serial.println(Z_MIN);
   Serial.print(F("[SET] zmax="));  Serial.println(Z_MAX);
+  Serial.print(F("[SET] pstart=")); Serial.println(PRESS_START);
+  Serial.print(F("[SET] pend="));   Serial.println(PRESS_END);
   Serial.println(F("----------------"));
 }
 
@@ -197,7 +220,8 @@ void loop() {
 
   logStatus("TAP");
   tapMotion();
-  yMotion();   // 末尾で Y と Z を同時にホームへ戻す
+  yMotion();      // 末尾で Y と Z を同時にホームへ戻す
+  pressMotion();  // めくったページが浮くので押さえる
 
   Serial.println(F("------ PAGE DONE ------"));
 

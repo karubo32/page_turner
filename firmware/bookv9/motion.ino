@@ -58,7 +58,7 @@ void goHome() {
 void tapMotion() {
   int touchPos   = getZTarget();
   int liftOffset = 8;
-  int zHold      = 155;
+  int zHold      = 160;
   int lift       = min(touchPos + liftOffset, zHold - 5);
 
   moveSmooth(zaxis, Z_HOME,      touchPos,    2.0);
@@ -66,6 +66,8 @@ void tapMotion() {
   moveSmooth(zaxis, touchPos,    lift,        2.0);
   moveSmooth(zaxis, lift,        lift - 2,    0.8);
   moveSmooth(zaxis, lift - 2,    lift + 15,   4.70);
+  moveSmooth(yaxis, 90,        82,    8);
+  moveSmooth(yaxis, 82,        90,    8);
   moveSmooth(zaxis, lift + 15,   lift + 11,   4.8);
   delay(500);
   moveSmooth(zaxis, lift +11,    lift + 15,   4.70);
@@ -82,4 +84,23 @@ void yMotion() {
   moveSmooth(yaxis, 80, 65, 6.0);
   moveSmooth(yaxis, 65, 50, 3.0);
   moveSmoothDual(50, Y_HOME, zaxis.read(), Z_HOME, 1.4);
+}
+
+// ===== ページ押さえ =====
+// めくったページが浮くので、Z軸をさらに倒して押さえつけてから戻る。
+// 角度はページ位置に応じて PRESS_START → PRESS_END で変化する。
+void pressMotion() {
+  int target = getPressAngle();
+
+  if (target > Z_MAX) {
+    Serial.print(F(">> 押さえ角度が Z_MAX で制限されました: "));
+    Serial.print(target);
+    Serial.print(F(" -> "));
+    Serial.print(Z_MAX);
+    Serial.println(F("  ('set zmax <val>' で上限を上げてください)"));
+  }
+
+  moveSmooth(zaxis, zaxis.read(), target, 2.0);
+  delay(PRESS_HOLD_MS);
+  moveSmooth(zaxis, zaxis.read(), Z_HOME, 2.0);
 }

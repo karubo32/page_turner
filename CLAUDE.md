@@ -45,10 +45,12 @@
   - addr 12〜14: 未使用（旧 testrun 保存領域）
   - addr 15〜17: totalPages保存 (magic + 2byte)
   - addr 18〜20: globalSpeed保存 (magic + value×100 の2byte)
-  - addr 21〜27: 可変設定保存 (magic + 6値)
+  - addr 21〜29: 可変設定保存 (magic + 8値)。**項目数を変えたらマジックも変えること**
 - `CALIB_SECTIONS_MAX = 11` を超える区間数には対応していない
 - `moveSmooth()` のspeedScaleは呼び出しごとに調整済み。むやみに変更しないこと
 - ページは**2ページ単位**で進む（currentPage += 2）
+- 1ページの動作順は `tapMotion()` → `yMotion()` → `pressMotion()`。  
+  `yMotion()` の末尾が `moveSmoothDual()` でY・Zを同時にホームへ戻す
 
 ### 可変設定（ホーム位置・サーボリミット）
 
@@ -56,16 +58,20 @@
 EEPROMに保存される。定数に戻さないこと。
 
 ```cpp
-int Y_HOME = 90;    // Y軸待機位置
-int Z_HOME = 90;    // Z軸待機位置
-int Y_MIN  = 45;    // Y軸リミット
+int Y_HOME = 90;       // Y軸待機位置
+int Z_HOME = 90;       // Z軸待機位置
+int Y_MIN  = 45;       // Y軸リミット
 int Y_MAX  = 210;
-int Z_MIN  = 20;    // Z軸リミット
-int Z_MAX  = 160;
+int Z_MIN  = 1;        // Z軸リミット
+int Z_MAX  = 180;
+int PRESS_START = 168; // ページ押さえ角度（先頭ページ）
+int PRESS_END   = 174; // ページ押さえ角度（最終ページ）
 ```
 
 - `set` は `[SET] <name>=<value>` 形式で出力する。GUIの `_parse_table_line()` がこれをパースするので**書式を変えないこと**
+- 設定名は `sscanf` の `%7s` で受けるため **7文字以内**にすること（`pstart` / `pend` はこの制約による短縮名）
 - `MIN >= MAX` になる変更は拒否される
+- 押さえ角度は `Z_MAX` を超えると `moveSmooth()` でクランプされる。既定の `Z_MAX = 180` はこれを見込んだ値
 - `moveSmooth()` はサーボアドレスで軸を識別し、自動でリミットを適用する
 - `writeY()` / `writeZ()` は constrain 付きの直接書き込みヘルパー
 

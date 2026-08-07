@@ -13,12 +13,14 @@ int readSerialLine(char* buf, int bufSize) {
 // ===== set コマンドの1項目を適用 =====
 // 戻り値: true=適用した / false=名前が不正
 bool applySetting(const char* name, int val) {
-  if      (strcmp(name, "yhome") == 0) Y_HOME = val;
-  else if (strcmp(name, "zhome") == 0) Z_HOME = val;
-  else if (strcmp(name, "ymin")  == 0) Y_MIN  = val;
-  else if (strcmp(name, "ymax")  == 0) Y_MAX  = val;
-  else if (strcmp(name, "zmin")  == 0) Z_MIN  = val;
-  else if (strcmp(name, "zmax")  == 0) Z_MAX  = val;
+  if      (strcmp(name, "yhome")  == 0) Y_HOME      = val;
+  else if (strcmp(name, "zhome")  == 0) Z_HOME      = val;
+  else if (strcmp(name, "ymin")   == 0) Y_MIN       = val;
+  else if (strcmp(name, "ymax")   == 0) Y_MAX       = val;
+  else if (strcmp(name, "zmin")   == 0) Z_MIN       = val;
+  else if (strcmp(name, "zmax")   == 0) Z_MAX       = val;
+  else if (strcmp(name, "pstart") == 0) PRESS_START = val;
+  else if (strcmp(name, "pend")   == 0) PRESS_END   = val;
   else return false;
   return true;
 }
@@ -61,6 +63,7 @@ void checkSerialInput() {
     Serial.println(F("  set              : 設定一覧を表示"));
     Serial.println(F("  set <name> <val> : 設定変更"));
     Serial.println(F("                     yhome/zhome/ymin/ymax/zmin/zmax"));
+    Serial.println(F("                     pstart/pend : ページ押さえ角度"));
     Serial.println(F("--- 本の設定 ---"));
     Serial.println(F("  pages <num>      : 総ページ数変更 例: pages 320"));
     Serial.println(F("  pages            : 現在の総ページ数を表示"));
@@ -285,9 +288,11 @@ void checkSerialInput() {
 
     // 変更前の値を控え、破綻したら戻す
     int oy = Y_HOME, oz = Z_HOME, oyl = Y_MIN, oyu = Y_MAX, ozl = Z_MIN, ozu = Z_MAX;
+    int ops = PRESS_START, ope = PRESS_END;
 
     if (!applySetting(name, val)) {
-      Serial.println(F(">> 不明な設定名 (yhome/zhome/ymin/ymax/zmin/zmax)"));
+      Serial.println(F(">> 不明な設定名"));
+      Serial.println(F("   yhome/zhome/ymin/ymax/zmin/zmax/pstart/pend"));
       return;
     }
 
@@ -295,6 +300,7 @@ void checkSerialInput() {
       Y_HOME = oy;  Z_HOME = oz;
       Y_MIN  = oyl; Y_MAX  = oyu;
       Z_MIN  = ozl; Z_MAX  = ozu;
+      PRESS_START = ops; PRESS_END = ope;
       Serial.println(F(">> 却下: MIN は MAX より小さくしてください"));
       return;
     }
@@ -307,6 +313,9 @@ void checkSerialInput() {
 
     if (Y_HOME < Y_MIN || Y_HOME > Y_MAX || Z_HOME < Z_MIN || Z_HOME > Z_MAX) {
       Serial.println(F(">> 注意: HOME がリミット範囲外です"));
+    }
+    if (PRESS_START > Z_MAX || PRESS_END > Z_MAX) {
+      Serial.println(F(">> 注意: 押さえ角度が zmax を超えています"));
     }
     printSettings();
     return;
@@ -351,7 +360,8 @@ void checkSerialInput() {
       Serial.println(F("deg"));
       logStatus("TEST");
       tapMotion();
-      yMotion();   // 末尾で Y と Z を同時にホームへ戻す
+      yMotion();      // 末尾で Y と Z を同時にホームへ戻す
+      pressMotion();  // めくったページが浮くので押さえる
       currentPage = savedPage;
     } else {
       Serial.println(F(">> ページ範囲外"));
