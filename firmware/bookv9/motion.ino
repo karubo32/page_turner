@@ -20,6 +20,32 @@ void moveSmooth(Servo& servo, int startPos, int endPos, float speedScale) {
   }
 }
 
+// ===== 2軸同時スムーズ移動 =====
+// 移動量の大きい方をステップ数の基準にし、もう一方は比率で追従させる。
+// これで両軸が同時に動き出し、同時に到着する。
+// デフォルト引数は bookv9.ino の前方宣言側に記述
+void moveSmoothDual(int yStart, int yEnd, int zStart, int zEnd, float speedScale) {
+  yStart = constrain(yStart, Y_MIN, Y_MAX);
+  yEnd   = constrain(yEnd,   Y_MIN, Y_MAX);
+  zStart = constrain(zStart, Z_MIN, Z_MAX);
+  zEnd   = constrain(zEnd,   Z_MIN, Z_MAX);
+
+  // max()/abs() はマクロで引数を複数回評価するため、先に変数へ入れておく
+  int yDist = abs(yEnd - yStart);
+  int zDist = abs(zEnd - zStart);
+  int steps = (yDist > zDist) ? yDist : zDist;
+  if (steps == 0) return;
+
+  for (int i = 0; i <= steps; i++) {
+    float t = (float)i / steps;
+    yaxis.write(yStart + (int)round((yEnd - yStart) * t));
+    zaxis.write(zStart + (int)round((zEnd - zStart) * t));
+    int d = (int)((10 + 40 * (1.0 - sin(t * PI))) * speedScale / globalSpeed);
+    d = max(d, 1);
+    delay(d);
+  }
+}
+
 // ===== ホームポジション復帰 =====
 void goHome() {
   Serial.println(F(">> GO HOME"));
@@ -32,7 +58,7 @@ void goHome() {
 void tapMotion() {
   int touchPos   = getZTarget();
   int liftOffset = 8;
-  int zHold      = getZHold();
+  int zHold      = 155;
   int lift       = min(touchPos + liftOffset, zHold - 5);
 
   moveSmooth(zaxis, Z_HOME,      touchPos,    2.0);
@@ -41,15 +67,19 @@ void tapMotion() {
   moveSmooth(zaxis, lift,        lift - 2,    0.8);
   moveSmooth(zaxis, lift - 2,    lift + 15,   4.70);
   moveSmooth(zaxis, lift + 15,   lift + 11,   4.8);
+  delay(500);
+  moveSmooth(zaxis, lift +11,    lift + 15,   4.70);
   delay(150);
+  moveSmooth(zaxis, lift + 15,   lift + 11,   4.8);
   moveSmooth(zaxis, lift + 11,   zHold,       2.0);
 }
 
 // ===== Y剥がし =====
+// 最後のホーム復帰は Y と Z を同時に動かす（Z は現在位置から Z_HOME へ）
 void yMotion() {
   moveSmooth(yaxis, Y_HOME, 80, 7.0);
   delay(500);
   moveSmooth(yaxis, 80, 65, 6.0);
   moveSmooth(yaxis, 65, 50, 3.0);
-  moveSmooth(yaxis, 50, Y_HOME, 1.4);
+  moveSmoothDual(50, Y_HOME, zaxis.read(), Z_HOME, 1.4);
 }

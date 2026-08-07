@@ -14,6 +14,7 @@ Servo zaxis;
 // Arduino IDEの自動プロトタイプ生成は Servo& 参照とデフォルト引数を
 // 正しく扱えないため、他タブの関数はここで明示的に宣言する
 void  moveSmooth(Servo& servo, int startPos, int endPos, float speedScale = 1.0);
+void  moveSmoothDual(int yStart, int yEnd, int zStart, int zEnd, float speedScale = 1.0);
 void  goHome();
 void  tapMotion();
 void  yMotion();
@@ -196,8 +197,7 @@ void loop() {
 
   logStatus("TAP");
   tapMotion();
-  yMotion();
-  moveSmooth(zaxis, getZHold(), Z_HOME);
+  yMotion();   // 末尾で Y と Z を同時にホームへ戻す
 
   Serial.println(F("------ PAGE DONE ------"));
 

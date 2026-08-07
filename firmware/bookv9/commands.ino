@@ -351,8 +351,7 @@ void checkSerialInput() {
       Serial.println(F("deg"));
       logStatus("TEST");
       tapMotion();
-      yMotion();
-      moveSmooth(zaxis, getZHold(), Z_HOME);
+      yMotion();   // 末尾で Y と Z を同時にホームへ戻す
       currentPage = savedPage;
     } else {
       Serial.println(F(">> ページ範囲外"));
