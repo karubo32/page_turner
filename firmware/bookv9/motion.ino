@@ -1,7 +1,8 @@
 // motion.ino — サーボ動作関数
 
 // ===== スムーズ移動 =====
-void moveSmooth(Servo& servo, int startPos, int endPos, float speedScale = 1.0) {
+// デフォルト引数は bookv9.ino の前方宣言側に記述（C++の仕様上、両方には書けない）
+void moveSmooth(Servo& servo, int startPos, int endPos, float speedScale) {
   int minA = (&servo == &yaxis) ? Y_MIN : Z_MIN;
   int maxA = (&servo == &yaxis) ? Y_MAX : Z_MAX;
   startPos = constrain(applyDirection(startPos), minA, maxA);

@@ -10,8 +10,33 @@ Y軸: D9（剥がし軸）/ Z軸: D10（タップ軸）
 Servo yaxis;
 Servo zaxis;
 
+// ===== 前方宣言 =====
+// Arduino IDEの自動プロトタイプ生成は Servo& 参照とデフォルト引数を
+// 正しく扱えないため、他タブの関数はここで明示的に宣言する
+void  moveSmooth(Servo& servo, int startPos, int endPos, float speedScale = 1.0);
+void  goHome();
+void  tapMotion();
+void  yMotion();
+void  wiperMotion();
+
+int   getSectionIndex(int page);
+float getInterpolatedZ(int page);
+int   getZTarget();
+void  saveCalibToEEPROM();
+bool  loadCalibFromEEPROM();
+void  printOffsetTable();
+void  runCalibSequence();
+void  runCalibration();
+
+int   readSerialLine(char* buf, int bufSize);
+void  checkSerialInput();
+
+void  saveTestrunState();
+void  clearTestrunState();
+void  runTestrun();
+
 // ===== 本情報 =====
-int totalPages  = 527;    // pages コマンドで変更可能
+int totalPages  = 180;    // pages コマンドで変更可能
 int currentPage = 1;
 
 // ===== 待機位置 =====
