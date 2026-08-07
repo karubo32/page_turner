@@ -39,8 +39,34 @@ int Y_HOME = 90;    // Y軸待機位置
 int Z_HOME = 90;    // Z軸待機位置
 int Y_MIN  = 45;    // Y軸リミット（下限）
 int Y_MAX  = 210;   // Y軸リミット（上限）
-int Z_MIN  = 1;     // Z軸リミット（下限）
+int Z_MIN  = -14;   // Z軸リミット（下限・マイナス可。下の Z_PULSE_FLOOR が物理的な限界）
 int Z_MAX  = 180;   // Z軸リミット（上限）
+
+// ===== Z軸のパルス幅制御 =====
+// Servo.write() は 0〜180 にクランプされるため 0° 未満へ動かせない。
+// そこで Z軸だけ writeMicroseconds() で直接制御する。
+// 角度⇔パルス幅の対応は Servo ライブラリ既定と同じにしてあるので、
+// キャリブ値・ホーム位置・押さえ角度の数値はこれまでと変わらない。
+const int Z_PULSE_AT_0   = 544;   //   0° 相当のパルス幅 [µs]
+const int Z_PULSE_AT_180 = 2400;  // 180° 相当のパルス幅 [µs]
+const int Z_PULSE_FLOOR  = 400;   // これより短いパルスは出さない（≒ -14°）
+
+// 最後にZ軸へ指令した角度。zaxis.read() は attach() のパルス幅設定に
+// 引きずられて別スケールを返すため、代わりにこの値を参照すること。
+int zAngleNow = 0;
+
+int zAngleToUs(int angle) {
+  long us = Z_PULSE_AT_0 + (long)angle * (Z_PULSE_AT_180 - Z_PULSE_AT_0) / 180;
+  if (us < Z_PULSE_FLOOR)   us = Z_PULSE_FLOOR;
+  if (us > Z_PULSE_AT_180)  us = Z_PULSE_AT_180;
+  return (int)us;
+}
+
+// Z軸へ角度で書き込む（リミット判定なし。moveSmooth等の内部用）
+void writeZRaw(int angle) {
+  zAngleNow = angle;
+  zaxis.writeMicroseconds(zAngleToUs(angle));
+}
 
 // めくったページを押さえる角度（ページ位置で先頭→最終を線形補間）
 int PRESS_START = 168;   // 先頭ページ
@@ -90,7 +116,7 @@ const int EEPROM_SPEED_MAGIC    = 0xE5;
 const int EEPROM_SETTINGS_ADDR  = 21;  // 可変設定 (21: magic, 22-29: 8値)
 // 保存する項目数を変えたらマジックも変えること。
 // 旧レイアウトのデータが読み込まれず、新しい既定値が入る。
-const int EEPROM_SETTINGS_MAGIC = 0xF2;
+const int EEPROM_SETTINGS_MAGIC = 0xF3;
 
 // ===== 速度設定 =====
 float globalSpeed = 1.50;  // 0.1=遅い / 1.0=標準 / 5.0=速い
@@ -100,7 +126,7 @@ void writeY(int angle) {
   yaxis.write(constrain(angle, Y_MIN, Y_MAX));
 }
 void writeZ(int angle) {
-  zaxis.write(constrain(angle, Z_MIN, Z_MAX));
+  writeZRaw(constrain(angle, Z_MIN, Z_MAX));
 }
 
 // ===== 可変設定のEEPROM保存 =====
@@ -110,7 +136,7 @@ void saveSettingsToEEPROM() {
   EEPROM.write(EEPROM_SETTINGS_ADDR + 2, (uint8_t)Z_HOME);
   EEPROM.write(EEPROM_SETTINGS_ADDR + 3, (uint8_t)Y_MIN);
   EEPROM.write(EEPROM_SETTINGS_ADDR + 4, (uint8_t)Y_MAX);
-  EEPROM.write(EEPROM_SETTINGS_ADDR + 5, (uint8_t)Z_MIN);
+  EEPROM.write(EEPROM_SETTINGS_ADDR + 5, (int8_t)Z_MIN);   // 負値あり（符号付き）
   EEPROM.write(EEPROM_SETTINGS_ADDR + 6, (uint8_t)Z_MAX);
   EEPROM.write(EEPROM_SETTINGS_ADDR + 7, (uint8_t)PRESS_START);
   EEPROM.write(EEPROM_SETTINGS_ADDR + 8, (uint8_t)PRESS_END);
@@ -124,7 +150,7 @@ void loadSettingsFromEEPROM() {
   int zh = EEPROM.read(EEPROM_SETTINGS_ADDR + 2);
   int yl = EEPROM.read(EEPROM_SETTINGS_ADDR + 3);
   int yu = EEPROM.read(EEPROM_SETTINGS_ADDR + 4);
-  int zl = EEPROM.read(EEPROM_SETTINGS_ADDR + 5);
+  int zl = (int8_t)EEPROM.read(EEPROM_SETTINGS_ADDR + 5);  // 負値あり（符号付き）
   int zu = EEPROM.read(EEPROM_SETTINGS_ADDR + 6);
   int ps = EEPROM.read(EEPROM_SETTINGS_ADDR + 7);
   int pe = EEPROM.read(EEPROM_SETTINGS_ADDR + 8);
@@ -174,7 +200,8 @@ void setup() {
   loadSettingsFromEEPROM();
 
   yaxis.attach(9);
-  zaxis.attach(10);
+  // Z軸は 0° 未満も使うため、パルス幅の下限を広げて attach する
+  zaxis.attach(10, Z_PULSE_FLOOR, Z_PULSE_AT_180);
   writeY(Y_HOME);
   writeZ(Z_HOME);
 

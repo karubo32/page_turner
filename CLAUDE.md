@@ -62,7 +62,7 @@ int Y_HOME = 90;       // Y軸待機位置
 int Z_HOME = 90;       // Z軸待機位置
 int Y_MIN  = 45;       // Y軸リミット
 int Y_MAX  = 210;
-int Z_MIN  = 1;        // Z軸リミット
+int Z_MIN  = -14;      // Z軸リミット（0°未満も可）
 int Z_MAX  = 180;
 int PRESS_START = 168; // ページ押さえ角度（先頭ページ）
 int PRESS_END   = 174; // ページ押さえ角度（最終ページ）
@@ -74,6 +74,21 @@ int PRESS_END   = 174; // ページ押さえ角度（最終ページ）
 - 押さえ角度は `Z_MAX` を超えると `moveSmooth()` でクランプされる。既定の `Z_MAX = 180` はこれを見込んだ値
 - `moveSmooth()` はサーボアドレスで軸を識別し、自動でリミットを適用する
 - `writeY()` / `writeZ()` は constrain 付きの直接書き込みヘルパー
+
+### Z軸のパルス幅制御（0°未満に対応）
+
+`Servo.write()` は 0〜180 にクランプされるため、Z軸だけ `writeMicroseconds()` で制御している。
+
+- `zaxis.attach(10, Z_PULSE_FLOOR, Z_PULSE_AT_180)` でパルス幅の下限を 400µs まで広げてある
+- **`zaxis.write()` / `zaxis.read()` を直接呼ばないこと。** `attach()` にパルス幅を渡すと
+  ライブラリ内部の角度スケールがずれるため、値が食い違う
+  - 書き込み → `writeZRaw(angle)`（リミットなし）または `writeZ(angle)`（リミットあり）
+  - 現在角度の取得 → グローバル変数 `zAngleNow`
+- 角度⇔µs の対応は Servo 既定と同じ（0°=544µs / 180°=2400µs）にしてあるので、
+  キャリブ値・ホーム位置・押さえ角度の数値は従来のまま使える
+- `Z_PULSE_FLOOR = 400` が物理的な下限（≒ -14°）。ここを下げるとサーボの
+  機械的ストッパーに当たり、発熱・ギア破損の恐れがある
+- `Z_MIN` は EEPROM に **符号付き (int8_t)** で保存する。他の設定は符号なし
 
 ---
 

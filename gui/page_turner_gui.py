@@ -801,6 +801,11 @@ class PageTurnerGUI:
         ("pend",   "押さえ角(最終)", "最終ページでのページ押さえ角度"),
     ]
 
+    # 入力を許す範囲。既定は 0〜255。
+    # zmin だけは Z軸をパルス幅制御しているため 0° 未満も指定できる。
+    SETTINGS_RANGE = {"zmin": (-30, 255)}
+    SETTINGS_RANGE_DEFAULT = (0, 255)
+
     def _open_settings(self):
         # すでに開いていれば前面に出すだけ
         if self.settings_win is not None and self.settings_win.winfo_exists():
@@ -881,8 +886,9 @@ class PageTurnerGUI:
             except ValueError:
                 messagebox.showerror("Error", f"{key}: 整数を入力してください")
                 return
-            if not (0 <= val <= 255):
-                messagebox.showerror("Error", f"{key}: 0〜255 で入力してください")
+            lo, hi = self.SETTINGS_RANGE.get(key, self.SETTINGS_RANGE_DEFAULT)
+            if not (lo <= val <= hi):
+                messagebox.showerror("Error", f"{key}: {lo}〜{hi} で入力してください")
                 return
             if self.settings.get(key) != str(val):
                 pending.append((key, val))

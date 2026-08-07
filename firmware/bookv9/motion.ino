@@ -3,8 +3,9 @@
 // ===== スムーズ移動 =====
 // デフォルト引数は bookv9.ino の前方宣言側に記述（C++の仕様上、両方には書けない）
 void moveSmooth(Servo& servo, int startPos, int endPos, float speedScale) {
-  int minA = (&servo == &yaxis) ? Y_MIN : Z_MIN;
-  int maxA = (&servo == &yaxis) ? Y_MAX : Z_MAX;
+  bool isY = (&servo == &yaxis);
+  int minA = isY ? Y_MIN : Z_MIN;
+  int maxA = isY ? Y_MAX : Z_MAX;
   startPos = constrain(startPos, minA, maxA);
   endPos   = constrain(endPos,   minA, maxA);
   int distance = abs(endPos - startPos);
@@ -15,7 +16,9 @@ void moveSmooth(Servo& servo, int startPos, int endPos, float speedScale) {
     float t = (float)i / distance;
     int d = (int)((10 + 40 * (1.0 - sin(t * PI))) * speedScale / globalSpeed);
     d = max(d, 1);
-    servo.write(pos);
+    // Z軸は 0° 未満も扱うためパルス幅で指令する
+    if (isY) servo.write(pos);
+    else     writeZRaw(pos);
     delay(d);
   }
 }
@@ -39,7 +42,7 @@ void moveSmoothDual(int yStart, int yEnd, int zStart, int zEnd, float speedScale
   for (int i = 0; i <= steps; i++) {
     float t = (float)i / steps;
     yaxis.write(yStart + (int)round((yEnd - yStart) * t));
-    zaxis.write(zStart + (int)round((zEnd - zStart) * t));
+    writeZRaw(zStart + (int)round((zEnd - zStart) * t));
     int d = (int)((10 + 40 * (1.0 - sin(t * PI))) * speedScale / globalSpeed);
     d = max(d, 1);
     delay(d);
@@ -50,7 +53,7 @@ void moveSmoothDual(int yStart, int yEnd, int zStart, int zEnd, float speedScale
 void goHome() {
   Serial.println(F(">> GO HOME"));
   moveSmooth(yaxis, yaxis.read(), Y_HOME, 2.0);
-  moveSmooth(zaxis, zaxis.read(), Z_HOME, 3.0);
+  moveSmooth(zaxis, zAngleNow, Z_HOME, 3.0);
   Serial.println(F(">> HOME POSITION"));
 }
 
@@ -83,7 +86,7 @@ void yMotion() {
   delay(500);
   moveSmooth(yaxis, 80, 65, 6.0);
   moveSmooth(yaxis, 65, 50, 3.0);
-  moveSmoothDual(50, Y_HOME, zaxis.read(), Z_HOME, 1.4);
+  moveSmoothDual(50, Y_HOME, zAngleNow, Z_HOME, 1.4);
 }
 
 // ===== ページ押さえ =====
@@ -100,7 +103,7 @@ void pressMotion() {
     Serial.println(F("  ('set zmax <val>' で上限を上げてください)"));
   }
 
-  moveSmooth(zaxis, zaxis.read(), target, 2.0);
+  moveSmooth(zaxis, zAngleNow, target, 2.0);
   delay(PRESS_HOLD_MS);
-  moveSmooth(zaxis, zaxis.read(), Z_HOME, 2.0);
+  moveSmooth(zaxis, zAngleNow, Z_HOME, 2.0);
 }

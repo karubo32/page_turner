@@ -64,6 +64,7 @@ void checkSerialInput() {
     Serial.println(F("  set <name> <val> : 設定変更"));
     Serial.println(F("                     yhome/zhome/ymin/ymax/zmin/zmax"));
     Serial.println(F("                     pstart/pend : ページ押さえ角度"));
+    Serial.println(F("                     zmin は 0 未満も可（最小 -14 程度）"));
     Serial.println(F("--- 本の設定 ---"));
     Serial.println(F("  pages <num>      : 総ページ数変更 例: pages 320"));
     Serial.println(F("  pages            : 現在の総ページ数を表示"));
@@ -128,7 +129,7 @@ void checkSerialInput() {
     if (isPaused) {
       int req     = atoi(cmd + 2);
       int clamped = constrain(req, Z_MIN, Z_MAX);
-      zaxis.write(clamped);
+      writeZRaw(clamped);
       Serial.print(F(">> Z -> "));
       Serial.print(clamped);
       if (clamped != req) Serial.print(F(" [LIMIT]"));
@@ -158,8 +159,8 @@ void checkSerialInput() {
   // === z+ / z- ===
   if (strcmp(cmd, "z+") == 0 || strcmp(cmd, "z-") == 0) {
     if (isPaused) {
-      int next = constrain(zaxis.read() + (cmd[1] == '+' ? 1 : -1), Z_MIN, Z_MAX);
-      zaxis.write(next);
+      int next = constrain(zAngleNow + (cmd[1] == '+' ? 1 : -1), Z_MIN, Z_MAX);
+      writeZRaw(next);
       Serial.print(F(">> Z -> "));
       Serial.println(next);
     } else {
@@ -281,8 +282,13 @@ void checkSerialInput() {
       Serial.println(F(">> 書式: set <name> <val>  例: set yhome 90"));
       return;
     }
-    if (val < 0 || val > 255) {
-      Serial.println(F(">> 範囲外です (0〜255)"));
+    // zmin だけは 0° 未満を許可する（Z軸はパルス幅制御でマイナスへ動かせる）
+    bool allowNegative = (strcmp(name, "zmin") == 0);
+    int  lo = allowNegative ? -30 : 0;
+    if (val < lo || val > 255) {
+      Serial.print(F(">> 範囲外です ("));
+      Serial.print(lo);
+      Serial.println(F("〜255)"));
       return;
     }
 
