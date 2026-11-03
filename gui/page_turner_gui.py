@@ -121,7 +121,11 @@ class PageTurnerGUI:
         self.settings_win  = None
         self.settings_vars = {}
 
+        # 矢印キーの長押しでコマンドが溢れないよう送信間隔を空ける
+        self._last_arrow_ms = 0
+
         self._build_ui()
+        self._bind_arrow_keys()
         self._refresh_ports()
         self._poll_log()
 
@@ -289,6 +293,8 @@ class PageTurnerGUI:
             FlatButton(arow, f"{axis}−", command=lambda a=cmd_str: self._send(f"{a}-"),
                        bg=SURFACE2, hover_bg=BORDER, fg=TEXT,
                        font_size=9, padx=8, pady=3).pack(side="left")
+        tk.Label(c5, text="矢印キー: ↑↓ = Z± / ←→ = Y±", bg=SURFACE, fg=TEXT3,
+                 font=("Segoe UI", 8)).pack(anchor="w", padx=14)
         tk.Frame(c5, bg=SURFACE, height=6).pack()
 
         # ── キャリブレーションカード ──
@@ -688,6 +694,25 @@ class PageTurnerGUI:
     def _cmd_step(self):     self._send("step")
     def _cmd_step_off(self): self._send("step off")
     def _cmd_next(self):   self._send("n")
+
+    ARROW_KEY_CMDS = {"Up": "z+", "Down": "z-", "Right": "y+", "Left": "y-"}
+    ARROW_REPEAT_MS = 60
+
+    def _bind_arrow_keys(self):
+        for key in self.ARROW_KEY_CMDS:
+            self.root.bind_all(f"<{key}>", self._on_arrow_key)
+
+    def _on_arrow_key(self, event):
+        # 入力欄・ポート選択の操作中は矢印キー本来の動作を優先する
+        if isinstance(event.widget, (tk.Entry, ttk.Combobox)):
+            return
+        if not self.connected:
+            return
+        if event.time - self._last_arrow_ms < self.ARROW_REPEAT_MS:
+            return "break"
+        self._last_arrow_ms = event.time
+        self._send(self.ARROW_KEY_CMDS[event.keysym])
+        return "break"
 
     def _fetch_all(self):
         """接続直後に総ページ数・キャリブテーブル・詳細設定をまとめて取得"""
