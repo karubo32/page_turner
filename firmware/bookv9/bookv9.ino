@@ -40,16 +40,17 @@ int Z_HOME = 90;    // Z軸待機位置
 int Y_MIN  = 45;    // Y軸リミット（下限）
 int Y_MAX  = 210;   // Y軸リミット（上限）
 int Z_MIN  = -14;   // Z軸リミット（下限・マイナス可。下の Z_PULSE_FLOOR が物理的な限界）
-int Z_MAX  = 180;   // Z軸リミット（上限）
+int Z_MAX  = 190;   // Z軸リミット（上限・180超も可。下の Z_PULSE_CEIL が物理的な限界）
 
 // ===== Z軸のパルス幅制御 =====
-// Servo.write() は 0〜180 にクランプされるため 0° 未満へ動かせない。
+// Servo.write() は 0〜180 にクランプされるため 0° 未満・180° 超へ動かせない。
 // そこで Z軸だけ writeMicroseconds() で直接制御する。
 // 角度⇔パルス幅の対応は Servo ライブラリ既定と同じにしてあるので、
 // キャリブ値・ホーム位置・押さえ角度の数値はこれまでと変わらない。
 const int Z_PULSE_AT_0   = 544;   //   0° 相当のパルス幅 [µs]
 const int Z_PULSE_AT_180 = 2400;  // 180° 相当のパルス幅 [µs]
 const int Z_PULSE_FLOOR  = 400;   // これより短いパルスは出さない（≒ -14°）
+const int Z_PULSE_CEIL   = 2510;  // これより長いパルスは出さない（≒ 190°）
 
 // 最後にZ軸へ指令した角度。zaxis.read() は attach() のパルス幅設定に
 // 引きずられて別スケールを返すため、代わりにこの値を参照すること。
@@ -58,7 +59,7 @@ int zAngleNow = 0;
 int zAngleToUs(int angle) {
   long us = Z_PULSE_AT_0 + (long)angle * (Z_PULSE_AT_180 - Z_PULSE_AT_0) / 180;
   if (us < Z_PULSE_FLOOR)   us = Z_PULSE_FLOOR;
-  if (us > Z_PULSE_AT_180)  us = Z_PULSE_AT_180;
+  if (us > Z_PULSE_CEIL)    us = Z_PULSE_CEIL;
   return (int)us;
 }
 
@@ -200,8 +201,8 @@ void setup() {
   loadSettingsFromEEPROM();
 
   yaxis.attach(9);
-  // Z軸は 0° 未満も使うため、パルス幅の下限を広げて attach する
-  zaxis.attach(10, Z_PULSE_FLOOR, Z_PULSE_AT_180);
+  // Z軸は 0° 未満・180° 超も使うため、パルス幅の上下限を広げて attach する
+  zaxis.attach(10, Z_PULSE_FLOOR, Z_PULSE_CEIL);
   writeY(Y_HOME);
   writeZ(Z_HOME);
 

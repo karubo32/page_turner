@@ -125,7 +125,7 @@ void checkSerialInput() {
   }
 
   // === z <angle> ===
-  if (strncmp(cmd, "z ", 2) == 0 && cmd[2] != '+' && cmd[2] != '-') {
+  if (strncmp(cmd, "z ", 2) == 0) {
     if (isPaused) {
       int req     = atoi(cmd + 2);
       int clamped = constrain(req, Z_MIN, Z_MAX);

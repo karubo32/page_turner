@@ -463,7 +463,7 @@ class PageTurnerGUI:
                 ds = self.calib_rows[s]["drag"]
                 if ds["x"] is None: return
                 delta = (ds["x"] - e.x_root) // 2  # 左ドラッグ→値増加（浅い）
-                new_val = max(10, min(80, ds["base"] + delta))
+                new_val = max(-14, min(80, ds["base"] + delta))
                 self.calib_rows[s]["angle_var"].set(str(new_val))
 
             def _drag_end(e, s=slot):
@@ -597,7 +597,7 @@ class PageTurnerGUI:
             self.root.after(0, lambda: self._update_total_pages(n))
             return
 
-        m = re.search(r'\[(\d+)\].*?Z=(\d+)', line)
+        m = re.search(r'\[(\d+)\].*?Z=(-?\d+)', line)
         if not m:
             return
         slot, z_val = int(m.group(1)), m.group(2)
