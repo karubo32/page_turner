@@ -46,6 +46,16 @@
   - addr 15〜17: totalPages保存 (magic + 2byte)
   - addr 18〜20: globalSpeed保存 (magic + value×100 の2byte)
   - addr 21〜29: 可変設定保存 (magic + 8値)。**項目数を変えたらマジックも変えること**
+  - addr 30〜46: サーボ補正 (magic 0xC5 + yCal[4]・zCal[4] を符号付き16bitで)
+
+### サーボ補正（scal、サーボ交換時）
+
+サーボを替えると同じ角度でも実際の位置がずれるため、軸ごとに2点で直線補正する。
+
+- `yCal` / `zCal` = `{a1, b1, a2, b2}`：設定上の角度 a1 を実際には b1、a2 を b2 で出す。既定 `{0, 0, 180, 180}` は補正なし
+- 補正は `writeYRaw()` / `writeZRaw()` の中だけでかかる。キャリブ値・ホーム・押さえ角度・リミットはすべて**補正前の角度**のまま
+- **`yaxis.write()` / `yaxis.read()` を直接呼ばないこと**（補正が抜ける）。書き込みは `writeYRaw()` / `writeY()`、現在角度は `yAngleNow`
+- `scal` は `[SCAL] y 90>92 50>47` 形式で出力する。GUIがパースするので書式を変えないこと
 - `CALIB_SECTIONS_MAX = 11` を超える区間数には対応していない
 - `moveSmooth()` のspeedScaleは呼び出しごとに調整済み。むやみに変更しないこと
 - ページは**2ページ単位**で進む（currentPage += 2）

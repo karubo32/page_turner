@@ -16,8 +16,8 @@ void moveSmooth(Servo& servo, int startPos, int endPos, float speedScale) {
     float t = (float)i / distance;
     int d = (int)((10 + 40 * (1.0 - sin(t * PI))) * speedScale / globalSpeed);
     d = max(d, 1);
-    // Z軸は 0° 未満も扱うためパルス幅で指令する
-    if (isY) servo.write(pos);
+    // 両軸ともサーボ補正（scal）を通して書き込む。Z軸はパルス幅で指令する
+    if (isY) writeYRaw(pos);
     else     writeZRaw(pos);
     delay(d);
   }
@@ -41,7 +41,7 @@ void moveSmoothDual(int yStart, int yEnd, int zStart, int zEnd, float speedScale
 
   for (int i = 0; i <= steps; i++) {
     float t = (float)i / steps;
-    yaxis.write(yStart + (int)round((yEnd - yStart) * t));
+    writeYRaw(yStart + (int)round((yEnd - yStart) * t));
     writeZRaw(zStart + (int)round((zEnd - zStart) * t));
     int d = (int)((10 + 40 * (1.0 - sin(t * PI))) * speedScale / globalSpeed);
     d = max(d, 1);
@@ -52,7 +52,7 @@ void moveSmoothDual(int yStart, int yEnd, int zStart, int zEnd, float speedScale
 // ===== ホームポジション復帰 =====
 void goHome() {
   Serial.println(F(">> GO HOME"));
-  moveSmooth(yaxis, yaxis.read(), Y_HOME, 2.0);
+  moveSmooth(yaxis, yAngleNow, Y_HOME, 2.0);
   moveSmooth(zaxis, zAngleNow, Z_HOME, 3.0);
   Serial.println(F(">> HOME POSITION"));
 }

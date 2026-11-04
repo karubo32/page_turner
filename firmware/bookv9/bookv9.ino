@@ -55,6 +55,25 @@ const int Z_PULSE_CEIL   = 2510;  // これより長いパルスは出さない�
 // 最後にZ軸へ指令した角度。zaxis.read() は attach() のパルス幅設定に
 // 引きずられて別スケールを返すため、代わりにこの値を参照すること。
 int zAngleNow = 0;
+// 最後にY軸へ指令した角度（補正前の角度。yaxis.read() は補正後を返すので使わない）
+int yAngleNow = 0;
+
+// ===== サーボ個体差の補正（scal コマンド / EEPROM保存）=====
+// サーボを替えると同じ角度でも実際の位置がずれるため、軸ごとに2点で直線補正する。
+// {a1, b1, a2, b2}: 設定上の角度 a1 を実際には b1 で、a2 を b2 で出す。
+// キャリブ値・ホーム位置・押さえ角度などは、すべて補正前の角度のまま使える。
+// 既定値 {0, 0, 180, 180} は補正なし（これまでと同じ動き）。
+int yCal[4] = {0, 0, 180, 180};
+int zCal[4] = {0, 0, 180, 180};
+
+int applyCal(const int* c, int angle) {
+  if (c[0] == c[2]) return angle;
+  return c[1] + (int)round((float)(angle - c[0]) * (c[3] - c[1]) / (c[2] - c[0]));
+}
+
+bool calIsIdentity(const int* c) {
+  return c[0] == 0 && c[1] == 0 && c[2] == 180 && c[3] == 180;
+}
 
 int zAngleToUs(int angle) {
   long us = Z_PULSE_AT_0 + (long)angle * (Z_PULSE_AT_180 - Z_PULSE_AT_0) / 180;
@@ -66,7 +85,13 @@ int zAngleToUs(int angle) {
 // Z軸へ角度で書き込む（リミット判定なし。moveSmooth等の内部用）
 void writeZRaw(int angle) {
   zAngleNow = angle;
-  zaxis.writeMicroseconds(zAngleToUs(angle));
+  zaxis.writeMicroseconds(zAngleToUs(applyCal(zCal, angle)));
+}
+
+// Y軸へ角度で書き込む（リミット判定なし。moveSmooth等の内部用）
+void writeYRaw(int angle) {
+  yAngleNow = angle;
+  yaxis.write(applyCal(yCal, angle));
 }
 
 // めくったページを押さえる角度（ページ位置で先頭→最終を線形補間）
@@ -118,13 +143,15 @@ const int EEPROM_SETTINGS_ADDR  = 21;  // 可変設定 (21: magic, 22-29: 8値)
 // 保存する項目数を変えたらマジックも変えること。
 // 旧レイアウトのデータが読み込まれず、新しい既定値が入る。
 const int EEPROM_SETTINGS_MAGIC = 0xF3;
+const int EEPROM_SCAL_ADDR      = 30;  // サーボ補正 (30: magic, 31-46: yCal・zCal の8値×2byte)
+const int EEPROM_SCAL_MAGIC     = 0xC5;
 
 // ===== 速度設定 =====
 float globalSpeed = 1.50;  // 0.1=遅い / 1.0=標準 / 5.0=速い
 
 // ===== 安全書き込み（リミット適用）=====
 void writeY(int angle) {
-  yaxis.write(constrain(angle, Y_MIN, Y_MAX));
+  writeYRaw(constrain(angle, Y_MIN, Y_MAX));
 }
 void writeZ(int angle) {
   writeZRaw(constrain(angle, Z_MIN, Z_MAX));
@@ -165,6 +192,39 @@ void loadSettingsFromEEPROM() {
   PRESS_START = ps;  PRESS_END = pe;
 }
 
+// ===== サーボ補正のEEPROM保存・読み込み =====
+void saveServoCalToEEPROM() {
+  EEPROM.write(EEPROM_SCAL_ADDR, EEPROM_SCAL_MAGIC);
+  for (int i = 0; i < 8; i++) {
+    int v = (i < 4) ? yCal[i] : zCal[i - 4];   // 負値あり（符号付き16bit）
+    EEPROM.write(EEPROM_SCAL_ADDR + 1 + i * 2, (uint8_t)((uint16_t)v >> 8));
+    EEPROM.write(EEPROM_SCAL_ADDR + 2 + i * 2, (uint8_t)((uint16_t)v & 0xFF));
+  }
+}
+
+void loadServoCalFromEEPROM() {
+  if (EEPROM.read(EEPROM_SCAL_ADDR) != EEPROM_SCAL_MAGIC) return;
+  int v[8];
+  for (int i = 0; i < 8; i++) {
+    v[i] = (int16_t)((EEPROM.read(EEPROM_SCAL_ADDR + 1 + i * 2) << 8)
+                     | EEPROM.read(EEPROM_SCAL_ADDR + 2 + i * 2));
+  }
+  // 基準の2点が同じ角度だと直線が決まらないので読み込まない
+  if (v[0] == v[2] || v[4] == v[6]) return;
+  for (int i = 0; i < 4; i++) { yCal[i] = v[i]; zCal[i] = v[i + 4]; }
+}
+
+// ===== サーボ補正の表示（GUIがパースする形式）=====
+// [SCAL] y 90>92 50>47  = 設定上の90°を実際は92°、50°を47°で出す
+void printServoCal() {
+  Serial.print(F("[SCAL] y "));
+  Serial.print(yCal[0]); Serial.print('>'); Serial.print(yCal[1]); Serial.print(' ');
+  Serial.print(yCal[2]); Serial.print('>'); Serial.println(yCal[3]);
+  Serial.print(F("[SCAL] z "));
+  Serial.print(zCal[0]); Serial.print('>'); Serial.print(zCal[1]); Serial.print(' ');
+  Serial.print(zCal[2]); Serial.print('>'); Serial.println(zCal[3]);
+}
+
 // ===== 設定一覧表示（GUIがパースする形式）=====
 void printSettings() {
   Serial.println(F("--- Settings ---"));
@@ -199,6 +259,7 @@ void setup() {
   Serial.begin(115200);
 
   loadSettingsFromEEPROM();
+  loadServoCalFromEEPROM();
 
   yaxis.attach(9);
   // Z軸は 0° 未満・180° 超も使うため、パルス幅の上下限を広げて attach する
@@ -226,6 +287,11 @@ void setup() {
 
   for (int i = 0; i < calibSections; i++) zOffsets[i] = Z_TOUCH_DEFAULT;
   loadCalibFromEEPROM();
+
+  if (!calIsIdentity(yCal) || !calIsIdentity(zCal)) {
+    Serial.println(F(">> SERVO CAL ON ('scal' で表示)"));
+    printServoCal();
+  }
 
   Serial.println(F("=== PAGE TURNER READY ==="));
   Serial.print(F(">> 総ページ数: "));

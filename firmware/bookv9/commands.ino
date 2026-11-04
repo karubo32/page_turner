@@ -65,6 +65,11 @@ void checkSerialInput() {
     Serial.println(F("                     yhome/zhome/ymin/ymax/zmin/zmax"));
     Serial.println(F("                     pstart/pend : ページ押さえ角度"));
     Serial.println(F("                     zmin は 0 未満も可（最小 -14 程度）"));
+    Serial.println(F("--- サーボ補正（サーボ交換時）---"));
+    Serial.println(F("  scal             : 補正を表示"));
+    Serial.println(F("  scal y a1 b1 a2 b2 : Y軸 a1->b1, a2->b2 で補正"));
+    Serial.println(F("  scal z a1 b1 a2 b2 : Z軸 同上"));
+    Serial.println(F("  scal off         : 補正なしに戻す"));
     Serial.println(F("--- 本の設定 ---"));
     Serial.println(F("  pages <num>      : 総ページ数変更 例: pages 320"));
     Serial.println(F("  pages            : 現在の総ページ数を表示"));
@@ -145,7 +150,7 @@ void checkSerialInput() {
     if (isPaused) {
       int req     = atoi(cmd + 2);
       int clamped = constrain(req, Y_MIN, Y_MAX);
-      yaxis.write(clamped);
+      writeYRaw(clamped);
       Serial.print(F(">> Y -> "));
       Serial.print(clamped);
       if (clamped != req) Serial.print(F(" [LIMIT]"));
@@ -172,8 +177,8 @@ void checkSerialInput() {
   // === y+ / y- ===
   if (strcmp(cmd, "y+") == 0 || strcmp(cmd, "y-") == 0) {
     if (isPaused) {
-      int next = constrain(yaxis.read() + (cmd[1] == '+' ? 1 : -1), Y_MIN, Y_MAX);
-      yaxis.write(next);
+      int next = constrain(yAngleNow + (cmd[1] == '+' ? 1 : -1), Y_MIN, Y_MAX);
+      writeYRaw(next);
       Serial.print(F(">> Y -> "));
       Serial.println(next);
     } else {
@@ -265,6 +270,45 @@ void checkSerialInput() {
     } else {
       Serial.println(F(">> 範囲外です (0.1〜5.0)"));
     }
+    return;
+  }
+
+  // === scal: サーボ補正 ===
+  // scal                       : 表示
+  // scal y <a1> <b1> <a2> <b2> : 設定上の a1 を実際は b1、a2 を b2 で出す（Y軸）
+  // scal z <a1> <b1> <a2> <b2> : 同じくZ軸
+  // scal off                   : 両軸とも補正なしに戻す（測り直すときはまずこれ）
+  if (strcmp(cmd, "scal") == 0) {
+    printServoCal();
+    return;
+  }
+  if (strcmp(cmd, "scal off") == 0) {
+    int idY[4] = {0, 0, 180, 180};
+    for (int i = 0; i < 4; i++) { yCal[i] = idY[i]; zCal[i] = idY[i]; }
+    saveServoCalToEEPROM();
+    writeYRaw(yAngleNow);   // 今の位置を補正なしで出し直す
+    writeZRaw(zAngleNow);
+    Serial.println(F(">> SERVO CAL OFF"));
+    printServoCal();
+    return;
+  }
+  if (strncmp(cmd, "scal ", 5) == 0 && (cmd[5] == 'y' || cmd[5] == 'z') && cmd[6] == ' ') {
+    int v[4];
+    if (sscanf(cmd + 7, "%d %d %d %d", &v[0], &v[1], &v[2], &v[3]) != 4) {
+      Serial.println(F(">> 書式: scal <y|z> <a1> <b1> <a2> <b2>  例: scal z 2 6 90 95"));
+      return;
+    }
+    if (v[0] == v[2]) {
+      Serial.println(F(">> 基準の2点は違う角度にしてください (a1 != a2)"));
+      return;
+    }
+    int* c = (cmd[5] == 'y') ? yCal : zCal;
+    for (int i = 0; i < 4; i++) c[i] = v[i];
+    saveServoCalToEEPROM();
+    writeYRaw(yAngleNow);   // 今の位置を新しい補正で出し直す
+    writeZRaw(zAngleNow);
+    Serial.println(F(">> SERVO CAL SET"));
+    printServoCal();
     return;
   }
 
