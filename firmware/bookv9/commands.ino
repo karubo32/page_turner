@@ -21,6 +21,11 @@ bool applySetting(const char* name, int val) {
   else if (strcmp(name, "zmax")   == 0) Z_MAX       = val;
   else if (strcmp(name, "pstart") == 0) PRESS_START = val;
   else if (strcmp(name, "pend")   == 0) PRESS_END   = val;
+  else if (strcmp(name, "zlift")  == 0) Z_LIFT      = val;
+  else if (strcmp(name, "ywiggle") == 0) Y_WIGGLE   = val;
+  else if (strcmp(name, "ypeel1") == 0) Y_PEEL1     = val;
+  else if (strcmp(name, "ypeel2") == 0) Y_PEEL2     = val;
+  else if (strcmp(name, "ypeel3") == 0) Y_PEEL3     = val;
   else return false;
   return true;
 }
@@ -64,6 +69,9 @@ void checkSerialInput() {
     Serial.println(F("  set <name> <val> : 設定変更"));
     Serial.println(F("                     yhome/zhome/ymin/ymax/zmin/zmax"));
     Serial.println(F("                     pstart/pend : ページ押さえ角度"));
+    Serial.println(F("                     zlift : タップ後に持ち上げるZ角度"));
+    Serial.println(F("                     ywiggle : タップ中のY揺らし幅"));
+    Serial.println(F("                     ypeel1/2/3 : めくるときのY角度"));
     Serial.println(F("                     zmin は 0 未満も可（最小 -14 程度）"));
     Serial.println(F("--- サーボ補正（サーボ交換時）---"));
     Serial.println(F("  scal             : 補正を表示"));
@@ -343,6 +351,7 @@ void checkSerialInput() {
     if (!applySetting(name, val)) {
       Serial.println(F(">> 不明な設定名"));
       Serial.println(F("   yhome/zhome/ymin/ymax/zmin/zmax/pstart/pend"));
+      Serial.println(F("   zlift/ywiggle/ypeel1/ypeel2/ypeel3"));
       return;
     }
 

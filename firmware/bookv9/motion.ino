@@ -61,7 +61,7 @@ void goHome() {
 void tapMotion() {
   int touchPos   = getZTarget();
   int liftOffset = 8;
-  int zHold      = 160;
+  int zHold      = Z_LIFT;   // set zlift で変更
   int lift       = min(touchPos + liftOffset, zHold - 5);
 
   moveSmooth(zaxis, Z_HOME,      touchPos,    2.0);
@@ -69,8 +69,8 @@ void tapMotion() {
   moveSmooth(zaxis, touchPos,    lift,        2.0);
   moveSmooth(zaxis, lift,        lift - 2,    0.8);
   moveSmooth(zaxis, lift - 2,    lift + 15,   4.70);
-  moveSmooth(yaxis, 90,        82,    8);
-  moveSmooth(yaxis, 82,        90,    8);
+  moveSmooth(yaxis, Y_HOME,            Y_HOME - Y_WIGGLE, 8);   // set ywiggle で変更
+  moveSmooth(yaxis, Y_HOME - Y_WIGGLE, Y_HOME,            8);
   moveSmooth(zaxis, lift + 15,   lift + 11,   4.8);
   delay(500);
   moveSmooth(zaxis, lift +11,    lift + 15,   4.70);
@@ -82,11 +82,12 @@ void tapMotion() {
 // ===== Y剥がし =====
 // 最後のホーム復帰は Y と Z を同時に動かす（Z は現在位置から Z_HOME へ）
 void yMotion() {
-  moveSmooth(yaxis, Y_HOME, 80, 7.0);
+  // 通る角度は set ypeel1 / ypeel2 / ypeel3 で変更
+  moveSmooth(yaxis, Y_HOME, Y_PEEL1, 7.0);
   delay(500);
-  moveSmooth(yaxis, 80, 65, 6.0);
-  moveSmooth(yaxis, 65, 50, 3.0);
-  moveSmoothDual(50, Y_HOME, zAngleNow, Z_HOME, 1.4);
+  moveSmooth(yaxis, Y_PEEL1, Y_PEEL2, 6.0);
+  moveSmooth(yaxis, Y_PEEL2, Y_PEEL3, 3.0);
+  moveSmoothDual(Y_PEEL3, Y_HOME, zAngleNow, Z_HOME, 1.4);
 }
 
 // ===== ページ押さえ =====

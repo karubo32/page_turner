@@ -94,6 +94,13 @@ void writeYRaw(int angle) {
   yaxis.write(applyCal(yCal, angle));
 }
 
+// めくり動作の途中の角度（set コマンドで変更・EEPROM保存。サーボ交換時に合わせ直す）
+int Z_LIFT   = 160;   // タップでページを捕まえたあと持ち上げるZ角度
+int Y_WIGGLE = 8;     // タップ中にYを揺らす幅（Y_HOME から何度下げるか）
+int Y_PEEL1  = 80;    // めくるときにYが通る角度（1→2→3 の順）
+int Y_PEEL2  = 65;
+int Y_PEEL3  = 50;
+
 // めくったページを押さえる角度（ページ位置で先頭→最終を線形補間）
 int PRESS_START = 168;   // 先頭ページ
 int PRESS_END   = 174;   // 最終ページ
@@ -145,6 +152,9 @@ const int EEPROM_SETTINGS_ADDR  = 21;  // 可変設定 (21: magic, 22-29: 8値)
 const int EEPROM_SETTINGS_MAGIC = 0xF3;
 const int EEPROM_SCAL_ADDR      = 30;  // サーボ補正 (30: magic, 31-46: yCal・zCal の8値×2byte)
 const int EEPROM_SCAL_MAGIC     = 0xC5;
+const int EEPROM_MOTION_ADDR    = 47;  // めくり動作の角度 (47: magic, 48-52: 5値)
+// 項目数を変えたらマジックも変えること
+const int EEPROM_MOTION_MAGIC   = 0xB7;
 
 // ===== 速度設定 =====
 float globalSpeed = 1.50;  // 0.1=遅い / 1.0=標準 / 5.0=速い
@@ -168,10 +178,26 @@ void saveSettingsToEEPROM() {
   EEPROM.write(EEPROM_SETTINGS_ADDR + 6, (uint8_t)Z_MAX);
   EEPROM.write(EEPROM_SETTINGS_ADDR + 7, (uint8_t)PRESS_START);
   EEPROM.write(EEPROM_SETTINGS_ADDR + 8, (uint8_t)PRESS_END);
+
+  EEPROM.write(EEPROM_MOTION_ADDR,     EEPROM_MOTION_MAGIC);
+  EEPROM.write(EEPROM_MOTION_ADDR + 1, (uint8_t)Z_LIFT);
+  EEPROM.write(EEPROM_MOTION_ADDR + 2, (uint8_t)Y_WIGGLE);
+  EEPROM.write(EEPROM_MOTION_ADDR + 3, (uint8_t)Y_PEEL1);
+  EEPROM.write(EEPROM_MOTION_ADDR + 4, (uint8_t)Y_PEEL2);
+  EEPROM.write(EEPROM_MOTION_ADDR + 5, (uint8_t)Y_PEEL3);
 }
 
 // ===== 可変設定のEEPROM読み込み =====
 void loadSettingsFromEEPROM() {
+  // めくり動作の角度は別ブロック（後から追加。無ければ既定値のまま）
+  if (EEPROM.read(EEPROM_MOTION_ADDR) == EEPROM_MOTION_MAGIC) {
+    Z_LIFT   = EEPROM.read(EEPROM_MOTION_ADDR + 1);
+    Y_WIGGLE = EEPROM.read(EEPROM_MOTION_ADDR + 2);
+    Y_PEEL1  = EEPROM.read(EEPROM_MOTION_ADDR + 3);
+    Y_PEEL2  = EEPROM.read(EEPROM_MOTION_ADDR + 4);
+    Y_PEEL3  = EEPROM.read(EEPROM_MOTION_ADDR + 5);
+  }
+
   if (EEPROM.read(EEPROM_SETTINGS_ADDR) != EEPROM_SETTINGS_MAGIC) return;
 
   int yh = EEPROM.read(EEPROM_SETTINGS_ADDR + 1);
@@ -236,6 +262,11 @@ void printSettings() {
   Serial.print(F("[SET] zmax="));  Serial.println(Z_MAX);
   Serial.print(F("[SET] pstart=")); Serial.println(PRESS_START);
   Serial.print(F("[SET] pend="));   Serial.println(PRESS_END);
+  Serial.print(F("[SET] zlift="));  Serial.println(Z_LIFT);
+  Serial.print(F("[SET] ywiggle=")); Serial.println(Y_WIGGLE);
+  Serial.print(F("[SET] ypeel1=")); Serial.println(Y_PEEL1);
+  Serial.print(F("[SET] ypeel2=")); Serial.println(Y_PEEL2);
+  Serial.print(F("[SET] ypeel3=")); Serial.println(Y_PEEL3);
   Serial.println(F("----------------"));
 }
 

@@ -47,6 +47,7 @@
   - addr 18〜20: globalSpeed保存 (magic + value×100 の2byte)
   - addr 21〜29: 可変設定保存 (magic + 8値)。**項目数を変えたらマジックも変えること**
   - addr 30〜46: サーボ補正 (magic 0xC5 + yCal[4]・zCal[4] を符号付き16bitで)
+  - addr 47〜52: めくり動作の角度 (magic 0xB7 + Z_LIFT・Y_WIGGLE・Y_PEEL1〜3)。**項目数を変えたらマジックも変えること**
 
 ### サーボ補正（scal、サーボ交換時）
 
@@ -76,6 +77,11 @@ int Z_MIN  = -14;      // Z軸リミット（0°未満も可）
 int Z_MAX  = 190;      // 180°超も可
 int PRESS_START = 168; // ページ押さえ角度（先頭ページ）
 int PRESS_END   = 174; // ページ押さえ角度（最終ページ）
+int Z_LIFT   = 160;    // タップ後に持ち上げるZ角度          (set zlift)
+int Y_WIGGLE = 8;      // タップ中のY揺らし幅（Y_HOMEから）   (set ywiggle)
+int Y_PEEL1  = 80;     // めくるときのY角度 1→2→3          (set ypeel1/2/3)
+int Y_PEEL2  = 65;
+int Y_PEEL3  = 50;
 ```
 
 - `set` は `[SET] <name>=<value>` 形式で出力する。GUIの `_parse_table_line()` がこれをパースするので**書式を変えないこと**
