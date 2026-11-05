@@ -17,6 +17,7 @@
 | `motion.ino` | moveSmooth / tapMotion / yMotion / goHome |
 | `calib.ino` | 補間・キャリブEEPROM・printOffsetTable |
 | `commands.ino` | readSerialLine・checkSerialInput（全コマンド） |
+| `rewind.ino` | 1ページ目に戻る動作（rewind / rw コマンド・EEPROM） |
 
 ---
 
@@ -49,6 +50,16 @@
   - addr 30〜46: サーボ補正 (magic 0xC5 + yCal[4]・zCal[4] を符号付き16bitで)
   - addr 47〜52: めくり動作の角度 (magic 0xB7 + Z_LIFT・Y_WIGGLE・Y_PEEL1〜3)。**項目数を変えたらマジックも変えること**
   - addr 53〜54: めくりの速さ (magic 0xD1 + Y_PEEL_SPEED[%])
+  - addr 55〜104: 1ページ目に戻る動作 (magic 0xE2 + 段数 + 8段×6byte: Y・Z 符号付き16bit、速さ、待ち/10ms)
+
+### 1ページ目に戻る動作（rewind.ino）
+
+- 段（最大8）を順に `moveSmoothDual()` で Y・Z 同時に動かし、待ち時間を置く。最後に `goHome()` して `currentPage = 1`
+- 速さ: speedScale = 10 / 速さ（10 が標準）。0 はなめらか移動なしで `writeY()` / `writeZ()` を直接呼ぶ
+- 段数 0 のときは動かずにページだけ 1 に戻す
+- `rw` は `[RW] n=<段数>` と `[RW] <段> y=.. z=.. s=.. w=..` を出力する。GUIがパースするので書式を変えないこと
+- コマンド処理は `handleRewindCommand()`。`checkSerialInput()` の先頭で呼んでいる
+- 最後のページに着いたあとは `start` / `resume` を受け付けない（`rewind` かページ指定で戻す）
 
 ### サーボ補正（scal、サーボ交換時）
 

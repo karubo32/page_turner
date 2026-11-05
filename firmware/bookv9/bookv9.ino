@@ -30,6 +30,9 @@ void  printOffsetTable();
 int   readSerialLine(char* buf, int bufSize);
 void  checkSerialInput();
 
+void  loadRewindFromEEPROM();
+bool  handleRewindCommand(const char* cmd);
+
 // ===== 本情報 =====
 int totalPages  = 180;    // pages コマンドで変更可能
 int currentPage = 1;
@@ -302,6 +305,7 @@ void setup() {
 
   loadSettingsFromEEPROM();
   loadServoCalFromEEPROM();
+  loadRewindFromEEPROM();
 
   yaxis.attach(9);
   // Z軸は 0° 未満・180° 超も使うため、パルス幅の上下限を広げて attach する
@@ -374,6 +378,6 @@ void loop() {
     Serial.println(F("=== END OF BOOK ==="));
     isPaused = true;
     goHome();
-    while (1) checkSerialInput();
+    // ここで止まったまま。'rewind' で 1 ページ目に戻すか、ページを指定して再開する
   }
 }

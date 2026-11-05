@@ -39,6 +39,9 @@ void checkSerialInput() {
   readSerialLine(cmd, sizeof(cmd));
   for (int i = 0; cmd[i]; i++) cmd[i] = tolower((unsigned char)cmd[i]);
 
+  // === rewind / rw（1ページ目に戻る。rewind.ino）===
+  if (handleRewindCommand(cmd)) return;
+
   // === help ===
   if (strcmp(cmd, "help") == 0 || strcmp(cmd, "h") == 0 || strcmp(cmd, "?") == 0) {
     Serial.println(F("========== HELP =========="));
@@ -75,6 +78,12 @@ void checkSerialInput() {
     Serial.println(F("                     ypeel1/2/3 : めくるときのY角度"));
     Serial.println(F("                     ypspeed : めくりの速さ% (10~200, 標準100)"));
     Serial.println(F("                     zmin は 0 未満も可（最小 -14 程度）"));
+    Serial.println(F("--- 1ページ目に戻る ---"));
+    Serial.println(F("  rewind           : 戻す動作を実行してページを1に"));
+    Serial.println(F("  rw               : 戻す動作の設定を表示"));
+    Serial.println(F("  rw <段> <Y> <Z> <速さ> <待ちms> : 段を設定（段 0~7）"));
+    Serial.println(F("  rw n <段数>      : 使う段数 0~8"));
+    Serial.println(F("  rw go <段>       : その段の位置へ動かす（停止中）"));
     Serial.println(F("--- サーボ補正（サーボ交換時）---"));
     Serial.println(F("  scal             : 補正を表示"));
     Serial.println(F("  scal y a1 b1 a2 b2 : Y軸 a1->b1, a2->b2 で補正"));
@@ -90,6 +99,12 @@ void checkSerialInput() {
   }
 
   // === start ===
+  bool wantsRun = strcmp(cmd, "start") == 0 || strcmp(cmd, "s") == 0
+               || strcmp(cmd, "r") == 0 || strcmp(cmd, "resume") == 0;
+  if (wantsRun && currentPage >= totalPages) {
+    Serial.println(F(">> 最後のページです。'rewind' で1ページ目に戻してください"));
+    return;
+  }
   if (strcmp(cmd, "start") == 0 || strcmp(cmd, "s") == 0) {
     if (!isStarted) {
       isStarted = true;
