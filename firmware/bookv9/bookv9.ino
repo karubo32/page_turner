@@ -103,6 +103,7 @@ int Y_WIGGLE = 8;     // タップ中にYを揺らす幅（Y_HOME から何度�
 int Y_PEEL1  = 80;    // めくるときにYが通る角度（1→2→3 の順）
 int Y_PEEL2  = 65;
 int Y_PEEL3  = 50;
+int PAGE_WAIT = 15;     // 1ページめくり終えてから次をめくるまでの待ち [0.1秒]。15 = 1.5秒 (set pwait)
 int Y_PEEL_SPEED = 100; // めくり（Y剥がし）の速さ [%]。100=標準、50=半分の速さ (set ypspeed)
 
 // めくったページを押さえる角度（ページ位置で先頭→最終を線形補間）
@@ -161,6 +162,8 @@ const int EEPROM_MOTION_ADDR    = 47;  // めくり動作の角度 (47: magic, 4
 const int EEPROM_MOTION_MAGIC   = 0xB7;
 const int EEPROM_PEELSPD_ADDR   = 53;  // めくりの速さ (53: magic, 54: 値)
 const int EEPROM_PEELSPD_MAGIC  = 0xD1;
+const int EEPROM_PWAIT_ADDR     = 105; // めくり後の待ち (105: magic, 106: 値)
+const int EEPROM_PWAIT_MAGIC    = 0xA9;
 
 // ===== 速度設定 =====
 float globalSpeed = 1.50;  // 0.1=遅い / 1.0=標準 / 5.0=速い
@@ -194,6 +197,9 @@ void saveSettingsToEEPROM() {
 
   EEPROM.write(EEPROM_PEELSPD_ADDR,     EEPROM_PEELSPD_MAGIC);
   EEPROM.write(EEPROM_PEELSPD_ADDR + 1, (uint8_t)Y_PEEL_SPEED);
+
+  EEPROM.write(EEPROM_PWAIT_ADDR,     EEPROM_PWAIT_MAGIC);
+  EEPROM.write(EEPROM_PWAIT_ADDR + 1, (uint8_t)PAGE_WAIT);
 }
 
 // ===== 可変設定のEEPROM読み込み =====
@@ -209,6 +215,9 @@ void loadSettingsFromEEPROM() {
   if (EEPROM.read(EEPROM_PEELSPD_ADDR) == EEPROM_PEELSPD_MAGIC) {
     int v = EEPROM.read(EEPROM_PEELSPD_ADDR + 1);
     if (v >= 10) Y_PEEL_SPEED = v;   // 0 だと割り算できないので読み込まない
+  }
+  if (EEPROM.read(EEPROM_PWAIT_ADDR) == EEPROM_PWAIT_MAGIC) {
+    PAGE_WAIT = EEPROM.read(EEPROM_PWAIT_ADDR + 1);
   }
 
   if (EEPROM.read(EEPROM_SETTINGS_ADDR) != EEPROM_SETTINGS_MAGIC) return;
@@ -281,6 +290,7 @@ void printSettings() {
   Serial.print(F("[SET] ypeel2=")); Serial.println(Y_PEEL2);
   Serial.print(F("[SET] ypeel3=")); Serial.println(Y_PEEL3);
   Serial.print(F("[SET] ypspeed=")); Serial.println(Y_PEEL_SPEED);
+  Serial.print(F("[SET] pwait="));  Serial.println(PAGE_WAIT);
   Serial.println(F("----------------"));
 }
 
@@ -356,7 +366,12 @@ void loop() {
     return;
   }
 
-  delay(1500);
+  // 次のページをめくるまで待つ（set pwait、0.1秒単位）。長く待つ間も STOP 等を受け付ける
+  for (unsigned long t0 = millis(); millis() - t0 < (unsigned long)PAGE_WAIT * 100UL; ) {
+    checkSerialInput();
+    if (!isStarted || isPaused) return;
+    delay(20);
+  }
 
   logStatus("TAP");
   tapMotion();

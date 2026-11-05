@@ -27,6 +27,7 @@ bool applySetting(const char* name, int val) {
   else if (strcmp(name, "ypeel2") == 0) Y_PEEL2     = val;
   else if (strcmp(name, "ypeel3") == 0) Y_PEEL3     = val;
   else if (strcmp(name, "ypspeed") == 0) Y_PEEL_SPEED = constrain(val, 10, 200);
+  else if (strcmp(name, "pwait")  == 0) PAGE_WAIT    = val;
   else return false;
   return true;
 }
@@ -77,6 +78,7 @@ void checkSerialInput() {
     Serial.println(F("                     ywiggle : タップ中のY揺らし幅"));
     Serial.println(F("                     ypeel1/2/3 : めくるときのY角度"));
     Serial.println(F("                     ypspeed : めくりの速さ% (10~200, 標準100)"));
+    Serial.println(F("                     pwait : めくり後の待ち 0.1秒単位 (0~255, 標準15)"));
     Serial.println(F("                     zmin は 0 未満も可（最小 -14 程度）"));
     Serial.println(F("--- 1ページ目に戻る ---"));
     Serial.println(F("  rewind           : 戻す動作を実行してページを1に"));
@@ -368,7 +370,7 @@ void checkSerialInput() {
     if (!applySetting(name, val)) {
       Serial.println(F(">> 不明な設定名"));
       Serial.println(F("   yhome/zhome/ymin/ymax/zmin/zmax/pstart/pend"));
-      Serial.println(F("   zlift/ywiggle/ypeel1/ypeel2/ypeel3/ypspeed"));
+      Serial.println(F("   zlift/ywiggle/ypeel1/ypeel2/ypeel3/ypspeed/pwait"));
       return;
     }
 
