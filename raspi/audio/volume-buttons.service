@@ -1,0 +1,10 @@
+[Unit]
+Description=Pirate Audio buttons change the speaker volume (X up, Y down)
+
+[Service]
+ExecStart=/usr/bin/python3 %h/volume_buttons.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

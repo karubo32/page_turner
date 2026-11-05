@@ -1,0 +1,35 @@
+# Pirate Audio has no hardware mixer: "Master" below is a software volume
+# (changed by the X/Y buttons via volume_buttons.py, or: amixer sset Master 80%).
+# Kept here rather than ~/.asoundrc, which the desktop audio menu may delete.
+pcm.!default {
+  type plug
+  slave.pcm "pirate_softvol"
+}
+pcm.pirate_softvol {
+  type softvol
+  slave.pcm "pirate_dmix"
+  control {
+    name "Master"
+    card sndrpihifiberry
+  }
+  min_dB -51.0
+  max_dB 0.0
+  resolution 101
+}
+pcm.pirate_dmix {
+  type dmix
+  ipc_key 5423
+  ipc_perm 0666
+  slave {
+    pcm "hw:CARD=sndrpihifiberry,DEV=0"
+    format S16_LE
+    rate 48000
+    channels 2
+    period_size 1024
+    buffer_size 4096
+  }
+}
+ctl.!default {
+  type hw
+  card sndrpihifiberry
+}

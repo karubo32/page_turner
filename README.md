@@ -15,6 +15,8 @@ page_turner/
 ├── launch_mac.command       # macOS 用起動ランチャー
 ├── gui/
 │   └── page_turner_gui.py   # Python GUIアプリ (tkinter + pyserial)
+├── raspi/
+│   └── audio/               # Raspberry Pi の Pirate Audio（音・X/Y 音量ボタン）
 ├── firmware/
 │   └── bookv9/              # Arduino スケッチフォルダ
 │       ├── bookv9.ino       # 設定・グローバル変数・EEPROM・setup・loop
@@ -137,6 +139,12 @@ GUI は、パソコンからボタン操作で本めくり装置を動かすた�
 
 - **CMD** 欄にコマンドを入力して Enter（または **Send ↵**）で、ボタンにない操作も直接送れます（例: `help` でコマンド一覧）。
 - **Serial Log** には、送ったコマンド（→、オレンジ）と Arduino からの応答（←、緑）が表示されます。**Clear** で消去。
+
+---
+
+## Raspberry Pi の音（Pirate Audio）
+
+ラズパイのスピーカー設定と X / Y ボタンの音量操作は [`raspi/audio/`](raspi/audio/) にあります。
 
 ---
 
