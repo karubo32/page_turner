@@ -26,6 +26,7 @@ bool applySetting(const char* name, int val) {
   else if (strcmp(name, "ypeel1") == 0) Y_PEEL1     = val;
   else if (strcmp(name, "ypeel2") == 0) Y_PEEL2     = val;
   else if (strcmp(name, "ypeel3") == 0) Y_PEEL3     = val;
+  else if (strcmp(name, "ypspeed") == 0) Y_PEEL_SPEED = constrain(val, 10, 200);
   else return false;
   return true;
 }
@@ -72,6 +73,7 @@ void checkSerialInput() {
     Serial.println(F("                     zlift : タップ後に持ち上げるZ角度"));
     Serial.println(F("                     ywiggle : タップ中のY揺らし幅"));
     Serial.println(F("                     ypeel1/2/3 : めくるときのY角度"));
+    Serial.println(F("                     ypspeed : めくりの速さ% (10~200, 標準100)"));
     Serial.println(F("                     zmin は 0 未満も可（最小 -14 程度）"));
     Serial.println(F("--- サーボ補正（サーボ交換時）---"));
     Serial.println(F("  scal             : 補正を表示"));
@@ -351,7 +353,7 @@ void checkSerialInput() {
     if (!applySetting(name, val)) {
       Serial.println(F(">> 不明な設定名"));
       Serial.println(F("   yhome/zhome/ymin/ymax/zmin/zmax/pstart/pend"));
-      Serial.println(F("   zlift/ywiggle/ypeel1/ypeel2/ypeel3"));
+      Serial.println(F("   zlift/ywiggle/ypeel1/ypeel2/ypeel3/ypspeed"));
       return;
     }
 
@@ -368,7 +370,7 @@ void checkSerialInput() {
     Serial.print(F(">> SET "));
     Serial.print(name);
     Serial.print(F(" = "));
-    Serial.println(val);
+    Serial.println((strcmp(name, "ypspeed") == 0) ? Y_PEEL_SPEED : val);
 
     if (Y_HOME < Y_MIN || Y_HOME > Y_MAX || Z_HOME < Z_MIN || Z_HOME > Z_MAX) {
       Serial.println(F(">> 注意: HOME がリミット範囲外です"));

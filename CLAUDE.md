@@ -48,6 +48,7 @@
   - addr 21〜29: 可変設定保存 (magic + 8値)。**項目数を変えたらマジックも変えること**
   - addr 30〜46: サーボ補正 (magic 0xC5 + yCal[4]・zCal[4] を符号付き16bitで)
   - addr 47〜52: めくり動作の角度 (magic 0xB7 + Z_LIFT・Y_WIGGLE・Y_PEEL1〜3)。**項目数を変えたらマジックも変えること**
+  - addr 53〜54: めくりの速さ (magic 0xD1 + Y_PEEL_SPEED[%])
 
 ### サーボ補正（scal、サーボ交換時）
 
@@ -82,6 +83,7 @@ int Y_WIGGLE = 8;      // タップ中のY揺らし幅（Y_HOMEから）   (set 
 int Y_PEEL1  = 80;     // めくるときのY角度 1→2→3          (set ypeel1/2/3)
 int Y_PEEL2  = 65;
 int Y_PEEL3  = 50;
+int Y_PEEL_SPEED = 100; // めくり（Y剥がし）の速さ[%] 10〜200   (set ypspeed)
 ```
 
 - `set` は `[SET] <name>=<value>` 形式で出力する。GUIの `_parse_table_line()` がこれをパースするので**書式を変えないこと**

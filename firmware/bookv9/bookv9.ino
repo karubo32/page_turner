@@ -100,6 +100,7 @@ int Y_WIGGLE = 8;     // タップ中にYを揺らす幅（Y_HOME から何度�
 int Y_PEEL1  = 80;    // めくるときにYが通る角度（1→2→3 の順）
 int Y_PEEL2  = 65;
 int Y_PEEL3  = 50;
+int Y_PEEL_SPEED = 100; // めくり（Y剥がし）の速さ [%]。100=標準、50=半分の速さ (set ypspeed)
 
 // めくったページを押さえる角度（ページ位置で先頭→最終を線形補間）
 int PRESS_START = 168;   // 先頭ページ
@@ -155,6 +156,8 @@ const int EEPROM_SCAL_MAGIC     = 0xC5;
 const int EEPROM_MOTION_ADDR    = 47;  // めくり動作の角度 (47: magic, 48-52: 5値)
 // 項目数を変えたらマジックも変えること
 const int EEPROM_MOTION_MAGIC   = 0xB7;
+const int EEPROM_PEELSPD_ADDR   = 53;  // めくりの速さ (53: magic, 54: 値)
+const int EEPROM_PEELSPD_MAGIC  = 0xD1;
 
 // ===== 速度設定 =====
 float globalSpeed = 1.50;  // 0.1=遅い / 1.0=標準 / 5.0=速い
@@ -185,6 +188,9 @@ void saveSettingsToEEPROM() {
   EEPROM.write(EEPROM_MOTION_ADDR + 3, (uint8_t)Y_PEEL1);
   EEPROM.write(EEPROM_MOTION_ADDR + 4, (uint8_t)Y_PEEL2);
   EEPROM.write(EEPROM_MOTION_ADDR + 5, (uint8_t)Y_PEEL3);
+
+  EEPROM.write(EEPROM_PEELSPD_ADDR,     EEPROM_PEELSPD_MAGIC);
+  EEPROM.write(EEPROM_PEELSPD_ADDR + 1, (uint8_t)Y_PEEL_SPEED);
 }
 
 // ===== 可変設定のEEPROM読み込み =====
@@ -196,6 +202,10 @@ void loadSettingsFromEEPROM() {
     Y_PEEL1  = EEPROM.read(EEPROM_MOTION_ADDR + 3);
     Y_PEEL2  = EEPROM.read(EEPROM_MOTION_ADDR + 4);
     Y_PEEL3  = EEPROM.read(EEPROM_MOTION_ADDR + 5);
+  }
+  if (EEPROM.read(EEPROM_PEELSPD_ADDR) == EEPROM_PEELSPD_MAGIC) {
+    int v = EEPROM.read(EEPROM_PEELSPD_ADDR + 1);
+    if (v >= 10) Y_PEEL_SPEED = v;   // 0 だと割り算できないので読み込まない
   }
 
   if (EEPROM.read(EEPROM_SETTINGS_ADDR) != EEPROM_SETTINGS_MAGIC) return;
@@ -267,6 +277,7 @@ void printSettings() {
   Serial.print(F("[SET] ypeel1=")); Serial.println(Y_PEEL1);
   Serial.print(F("[SET] ypeel2=")); Serial.println(Y_PEEL2);
   Serial.print(F("[SET] ypeel3=")); Serial.println(Y_PEEL3);
+  Serial.print(F("[SET] ypspeed=")); Serial.println(Y_PEEL_SPEED);
   Serial.println(F("----------------"));
 }
 

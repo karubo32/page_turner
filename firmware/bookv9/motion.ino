@@ -82,11 +82,12 @@ void tapMotion() {
 // ===== Y剥がし =====
 // 最後のホーム復帰は Y と Z を同時に動かす（Z は現在位置から Z_HOME へ）
 void yMotion() {
-  // 通る角度は set ypeel1 / ypeel2 / ypeel3 で変更
-  moveSmooth(yaxis, Y_HOME, Y_PEEL1, 7.0);
+  // 通る角度は set ypeel1 / ypeel2 / ypeel3、速さは set ypspeed（%）で変更
+  float slow = 100.0 / Y_PEEL_SPEED;   // 50% なら 2倍ゆっくり
+  moveSmooth(yaxis, Y_HOME, Y_PEEL1, 7.0 * slow);
   delay(500);
-  moveSmooth(yaxis, Y_PEEL1, Y_PEEL2, 6.0);
-  moveSmooth(yaxis, Y_PEEL2, Y_PEEL3, 3.0);
+  moveSmooth(yaxis, Y_PEEL1, Y_PEEL2, 6.0 * slow);
+  moveSmooth(yaxis, Y_PEEL2, Y_PEEL3, 3.0 * slow);
   moveSmoothDual(Y_PEEL3, Y_HOME, zAngleNow, Z_HOME, 1.4);
 }
 
