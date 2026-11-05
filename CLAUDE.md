@@ -50,7 +50,7 @@
   - addr 30〜46: サーボ補正 (magic 0xC5 + yCal[4]・zCal[4] を符号付き16bitで)
   - addr 47〜52: めくり動作の角度 (magic 0xB7 + Z_LIFT・Y_WIGGLE・Y_PEEL1〜3)。**項目数を変えたらマジックも変えること**
   - addr 53〜54: めくりの速さ (magic 0xD1 + Y_PEEL_SPEED[%])
-  - addr 105〜106: めくり後の待ち (magic 0xA9 + PAGE_WAIT[0.1秒])
+  - addr 105〜106: めくり後の待ち (magic 0xAA + PAGE_WAIT[秒]。旧 0xA9 は0.1秒単位)
   - addr 107〜109: めくり開始位置 (magic 0x9B + Y_BASE・Z_BASE)
   - addr 55〜104: 1ページ目に戻る動作 (magic 0xE2 + 段数 + 8段×6byte: Y・Z 符号付き16bit、速さ、待ち/10ms)
 
@@ -99,7 +99,7 @@ int Y_PEEL1  = 80;     // めくるときのY角度 1→2→3          (set ypee
 int Y_PEEL2  = 65;
 int Y_PEEL3  = 50;
 int Y_PEEL_SPEED = 100; // めくり（Y剥がし）の速さ[%] 10〜200   (set ypspeed)
-int PAGE_WAIT = 15;     // めくり後の待ち[0.1秒]。待つ間も checkSerialInput() で STOP を受け付ける (set pwait)
+int PAGE_WAIT = 2;      // めくり後の待ち[秒]。待つ間も checkSerialInput() で STOP を受け付ける (set pwait)
 ```
 
 - `set` は `[SET] <name>=<value>` 形式で出力する。GUIの `_parse_table_line()` がこれをパースするので**書式を変えないこと**

@@ -105,7 +105,7 @@ int Y_WIGGLE = 8;     // タップ中にYを揺らす幅（Y_BASE から何度�
 int Y_PEEL1  = 80;    // めくるときにYが通る角度（1→2→3 の順）
 int Y_PEEL2  = 65;
 int Y_PEEL3  = 50;
-int PAGE_WAIT = 15;     // 1ページめくり終えてから次をめくるまでの待ち [0.1秒]。15 = 1.5秒 (set pwait)
+int PAGE_WAIT = 2;      // 1ページめくり終えてから次をめくるまでの待ち [秒] (set pwait)
 int Y_PEEL_SPEED = 100; // めくり（Y剥がし）の速さ [%]。100=標準、50=半分の速さ (set ypspeed)
 
 // めくったページを押さえる角度（ページ位置で先頭→最終を線形補間）
@@ -164,8 +164,9 @@ const int EEPROM_MOTION_ADDR    = 47;  // めくり動作の角度 (47: magic, 4
 const int EEPROM_MOTION_MAGIC   = 0xB7;
 const int EEPROM_PEELSPD_ADDR   = 53;  // めくりの速さ (53: magic, 54: 値)
 const int EEPROM_PEELSPD_MAGIC  = 0xD1;
-const int EEPROM_PWAIT_ADDR     = 105; // めくり後の待ち (105: magic, 106: 値)
-const int EEPROM_PWAIT_MAGIC    = 0xA9;
+const int EEPROM_PWAIT_ADDR     = 105; // めくり後の待ち (105: magic, 106: 秒)
+// 0xA9 は旧 0.1秒単位。単位を変えたのでマジックも変え、旧値は読み込まない
+const int EEPROM_PWAIT_MAGIC    = 0xAA;
 const int EEPROM_BASE_ADDR      = 107; // めくり開始位置 (107: magic, 108: Y_BASE, 109: Z_BASE)
 const int EEPROM_BASE_MAGIC     = 0x9B;
 
@@ -380,8 +381,8 @@ void loop() {
     return;
   }
 
-  // 次のページをめくるまで待つ（set pwait、0.1秒単位）。長く待つ間も STOP 等を受け付ける
-  for (unsigned long t0 = millis(); millis() - t0 < (unsigned long)PAGE_WAIT * 100UL; ) {
+  // 次のページをめくるまで待つ（set pwait、秒単位）。長く待つ間も STOP 等を受け付ける
+  for (unsigned long t0 = millis(); millis() - t0 < (unsigned long)PAGE_WAIT * 1000UL; ) {
     checkSerialInput();
     if (!isStarted || isPaused) return;
     delay(20);
