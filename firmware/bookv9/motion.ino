@@ -59,22 +59,22 @@ void goHome() {
 
 // ===== タップ動作 =====
 void tapMotion() {
-  // めくり始める前に Y・Z をホームへ戻す（手動操作などでずれていても、ここから動く）
-  // 既にホームにいれば moveSmoothDual は何もしない
-  moveSmoothDual(yAngleNow, Y_HOME, zAngleNow, Z_HOME, 2.0);
+  // 待機位置（または手動で動かした位置）から、まずめくり開始位置 (Y_BASE, Z_BASE) へ移る。
+  // めくり動作はすべてこの位置を基準に動く。既にそこにいれば moveSmoothDual は何もしない
+  moveSmoothDual(yAngleNow, Y_BASE, zAngleNow, Z_BASE, 2.0);
 
   int touchPos   = getZTarget();
   int liftOffset = 8;
   int zHold      = Z_LIFT;   // set zlift で変更
   int lift       = min(touchPos + liftOffset, zHold - 5);
 
-  moveSmooth(zaxis, Z_HOME,      touchPos,    2.0);
+  moveSmooth(zaxis, Z_BASE,      touchPos,    2.0);
   delay(80);
   moveSmooth(zaxis, touchPos,    lift,        2.0);
   moveSmooth(zaxis, lift,        lift - 2,    0.8);
   moveSmooth(zaxis, lift - 2,    lift + 15,   4.70);
-  moveSmooth(yaxis, Y_HOME,            Y_HOME - Y_WIGGLE, 8);   // set ywiggle で変更
-  moveSmooth(yaxis, Y_HOME - Y_WIGGLE, Y_HOME,            8);
+  moveSmooth(yaxis, Y_BASE,            Y_BASE - Y_WIGGLE, 8);   // set ywiggle で変更
+  moveSmooth(yaxis, Y_BASE - Y_WIGGLE, Y_BASE,            8);
   moveSmooth(zaxis, lift + 15,   lift + 11,   4.8);
   delay(500);
   moveSmooth(zaxis, lift +11,    lift + 15,   4.70);
@@ -84,15 +84,15 @@ void tapMotion() {
 }
 
 // ===== Y剥がし =====
-// 最後のホーム復帰は Y と Z を同時に動かす（Z は現在位置から Z_HOME へ）
+// 最後は Y と Z を同時にめくり開始位置へ戻す（Z は現在位置から Z_BASE へ）
 void yMotion() {
   // 通る角度は set ypeel1 / ypeel2 / ypeel3、速さは set ypspeed（%）で変更
   float slow = 100.0 / Y_PEEL_SPEED;   // 50% なら 2倍ゆっくり
-  moveSmooth(yaxis, Y_HOME, Y_PEEL1, 7.0 * slow);
+  moveSmooth(yaxis, Y_BASE, Y_PEEL1, 7.0 * slow);
   delay(500);
   moveSmooth(yaxis, Y_PEEL1, Y_PEEL2, 6.0 * slow);
   moveSmooth(yaxis, Y_PEEL2, Y_PEEL3, 3.0 * slow);
-  moveSmoothDual(Y_PEEL3, Y_HOME, zAngleNow, Z_HOME, 1.4);
+  moveSmoothDual(Y_PEEL3, Y_BASE, zAngleNow, Z_BASE, 1.4);
 }
 
 // ===== ページ押さえ =====
@@ -111,5 +111,6 @@ void pressMotion() {
 
   moveSmooth(zaxis, zAngleNow, target, 2.0);
   delay(PRESS_HOLD_MS);
-  moveSmooth(zaxis, zAngleNow, Z_HOME, 2.0);
+  // めくり終えたら待機位置 (Y_HOME, Z_HOME) へ移って待つ
+  moveSmoothDual(yAngleNow, Y_HOME, zAngleNow, Z_HOME, 2.0);
 }

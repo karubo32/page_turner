@@ -51,6 +51,7 @@
   - addr 47〜52: めくり動作の角度 (magic 0xB7 + Z_LIFT・Y_WIGGLE・Y_PEEL1〜3)。**項目数を変えたらマジックも変えること**
   - addr 53〜54: めくりの速さ (magic 0xD1 + Y_PEEL_SPEED[%])
   - addr 105〜106: めくり後の待ち (magic 0xA9 + PAGE_WAIT[0.1秒])
+  - addr 107〜109: めくり開始位置 (magic 0x9B + Y_BASE・Z_BASE)
   - addr 55〜104: 1ページ目に戻る動作 (magic 0xE2 + 段数 + 8段×6byte: Y・Z 符号付き16bit、速さ、待ち/10ms)
 
 ### 1ページ目に戻る動作（rewind.ino）
@@ -82,8 +83,10 @@
 EEPROMに保存される。定数に戻さないこと。
 
 ```cpp
-int Y_HOME = 90;       // Y軸待機位置
+int Y_HOME = 90;       // Y軸待機位置（めくり終えたあと止まる場所）
 int Z_HOME = 90;       // Z軸待機位置
+int Y_BASE = 90;       // めくり開始位置。待機位置→ここ→めくり。めくり動作はここ基準 (set ybase)
+int Z_BASE = 90;       //                                                    (set zbase)
 int Y_MIN  = 45;       // Y軸リミット
 int Y_MAX  = 210;
 int Z_MIN  = -14;      // Z軸リミット（0°未満も可）

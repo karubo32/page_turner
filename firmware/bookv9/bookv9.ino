@@ -38,8 +38,10 @@ int totalPages  = 180;    // pages コマンドで変更可能
 int currentPage = 1;
 
 // ===== 可変設定（set コマンド / GUIの詳細設定から変更・EEPROM保存）=====
-int Y_HOME = 90;    // Y軸待機位置
+int Y_HOME = 90;    // Y軸待機位置（めくり終えたあと止まっている場所）
 int Z_HOME = 90;    // Z軸待機位置
+int Y_BASE = 90;    // めくり開始位置。待機位置からここを経由してめくり、めくり動作はここを基準に動く (set ybase)
+int Z_BASE = 90;    //                                                                          (set zbase)
 int Y_MIN  = 45;    // Y軸リミット（下限）
 int Y_MAX  = 210;   // Y軸リミット（上限）
 int Z_MIN  = -14;   // Z軸リミット（下限・マイナス可。下の Z_PULSE_FLOOR が物理的な限界）
@@ -99,7 +101,7 @@ void writeYRaw(int angle) {
 
 // めくり動作の途中の角度（set コマンドで変更・EEPROM保存。サーボ交換時に合わせ直す）
 int Z_LIFT   = 160;   // タップでページを捕まえたあと持ち上げるZ角度
-int Y_WIGGLE = 8;     // タップ中にYを揺らす幅（Y_HOME から何度下げるか）
+int Y_WIGGLE = 8;     // タップ中にYを揺らす幅（Y_BASE から何度下げるか）
 int Y_PEEL1  = 80;    // めくるときにYが通る角度（1→2→3 の順）
 int Y_PEEL2  = 65;
 int Y_PEEL3  = 50;
@@ -164,6 +166,8 @@ const int EEPROM_PEELSPD_ADDR   = 53;  // めくりの速さ (53: magic, 54: 値
 const int EEPROM_PEELSPD_MAGIC  = 0xD1;
 const int EEPROM_PWAIT_ADDR     = 105; // めくり後の待ち (105: magic, 106: 値)
 const int EEPROM_PWAIT_MAGIC    = 0xA9;
+const int EEPROM_BASE_ADDR      = 107; // めくり開始位置 (107: magic, 108: Y_BASE, 109: Z_BASE)
+const int EEPROM_BASE_MAGIC     = 0x9B;
 
 // ===== 速度設定 =====
 float globalSpeed = 1.50;  // 0.1=遅い / 1.0=標準 / 5.0=速い
@@ -200,6 +204,10 @@ void saveSettingsToEEPROM() {
 
   EEPROM.write(EEPROM_PWAIT_ADDR,     EEPROM_PWAIT_MAGIC);
   EEPROM.write(EEPROM_PWAIT_ADDR + 1, (uint8_t)PAGE_WAIT);
+
+  EEPROM.write(EEPROM_BASE_ADDR,     EEPROM_BASE_MAGIC);
+  EEPROM.write(EEPROM_BASE_ADDR + 1, (uint8_t)Y_BASE);
+  EEPROM.write(EEPROM_BASE_ADDR + 2, (uint8_t)Z_BASE);
 }
 
 // ===== 可変設定のEEPROM読み込み =====
@@ -218,6 +226,10 @@ void loadSettingsFromEEPROM() {
   }
   if (EEPROM.read(EEPROM_PWAIT_ADDR) == EEPROM_PWAIT_MAGIC) {
     PAGE_WAIT = EEPROM.read(EEPROM_PWAIT_ADDR + 1);
+  }
+  if (EEPROM.read(EEPROM_BASE_ADDR) == EEPROM_BASE_MAGIC) {
+    Y_BASE = EEPROM.read(EEPROM_BASE_ADDR + 1);
+    Z_BASE = EEPROM.read(EEPROM_BASE_ADDR + 2);
   }
 
   if (EEPROM.read(EEPROM_SETTINGS_ADDR) != EEPROM_SETTINGS_MAGIC) return;
@@ -278,6 +290,8 @@ void printSettings() {
   Serial.println(F("--- Settings ---"));
   Serial.print(F("[SET] yhome=")); Serial.println(Y_HOME);
   Serial.print(F("[SET] zhome=")); Serial.println(Z_HOME);
+  Serial.print(F("[SET] ybase=")); Serial.println(Y_BASE);
+  Serial.print(F("[SET] zbase=")); Serial.println(Z_BASE);
   Serial.print(F("[SET] ymin="));  Serial.println(Y_MIN);
   Serial.print(F("[SET] ymax="));  Serial.println(Y_MAX);
   Serial.print(F("[SET] zmin="));  Serial.println(Z_MIN);
