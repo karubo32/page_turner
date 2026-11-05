@@ -59,6 +59,10 @@ void goHome() {
 
 // ===== タップ動作 =====
 void tapMotion() {
+  // めくり始める前に Y・Z をホームへ戻す（手動操作などでずれていても、ここから動く）
+  // 既にホームにいれば moveSmoothDual は何もしない
+  moveSmoothDual(yAngleNow, Y_HOME, zAngleNow, Z_HOME, 2.0);
+
   int touchPos   = getZTarget();
   int liftOffset = 8;
   int zHold      = Z_LIFT;   // set zlift で変更
