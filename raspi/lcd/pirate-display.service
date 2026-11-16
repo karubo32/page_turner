@@ -1,0 +1,11 @@
+[Unit]
+Description=Pirate Audio LCD: page turner state, pages and UNMET recognition
+
+[Service]
+# Runs with the UNMET venv because the st7789 library is installed there.
+ExecStart=%h/unmet_raspberrypi/.venv/bin/python %h/pirate_display.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Page Turner
+Comment=本めくり装置 コントローラー
+Exec=python3 /home/jimaydev/page_turner/page_turner_gui.py
+Path=/home/jimaydev/page_turner
+Icon=accessories-text-editor
+Terminal=false
+Categories=Utility;
